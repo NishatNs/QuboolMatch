@@ -3,6 +3,10 @@ import { useNavigate } from "react-router-dom";
 
 const SignUp: React.FC = () => {
   const [ageRange, setAgeRange] = useState({ from: "", to: "" });
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const navigate = useNavigate();
 
   const handleAgeRangeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -10,12 +14,37 @@ const SignUp: React.FC = () => {
     setAgeRange((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate sign-up process
-    setTimeout(() => {
-      navigate("/nid-verification"); // Redirect to NID Verification page
-    }, 1000);
+    setLoading(true);
+    setError("");
+    
+    try {
+      // Call backend API for sign up
+      const response = await fetch("http://localhost:8000/auth/sign_up", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Failed to sign up");
+      }
+      
+      // If successful, navigate to the next page
+      navigate("/nid-verification");
+    } catch (err) {
+      console.error("Signup error:", err);
+      setError(err instanceof Error ? err.message : "An error occurred during signup");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -46,6 +75,9 @@ const SignUp: React.FC = () => {
               id="email"
               className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
               placeholder="Enter your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
             />
           </div>
 
@@ -59,6 +91,9 @@ const SignUp: React.FC = () => {
               id="password"
               className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
               placeholder="Create a password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
             />
           </div>
 
@@ -142,12 +177,20 @@ const SignUp: React.FC = () => {
             </div>
           </div>
 
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-2 bg-red-100 border border-red-400 text-red-700 rounded">
+              {error}
+            </div>
+          )}
+
           {/* Submit Button */}
           <button
             type="submit"
             className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition"
+            disabled={loading}
           >
-            Sign Up
+            {loading ? "Signing up..." : "Sign Up"}
           </button>
         </form>
       </div>

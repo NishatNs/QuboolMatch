@@ -1,4 +1,4 @@
-import React from "react";
+
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import Home from "./components/Home";
@@ -11,28 +11,31 @@ import Footer from "./components/Footer";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import NIDVerification from "./pages/NIDVerification";
-import ProfilePage from "./pages/ProfilePage"; // Import the ProfilePage
+import ProfilePage from "./pages/ProfilePage";
+import { AuthProvider } from "./context/AuthContext";
 
-function App() {
+function App(): JSX.Element {
   return (
-    <Router>
-      <div className="min-h-screen bg-white">
-        <Navbar />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/why-choose-us" element={<WhyChooseUs />} />
-          <Route path="/services" element={<Services />} />
-          <Route path="/testimonials" element={<Testimonials />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/signup" element={<SignUp />} />
-          <Route path="/nid-verification" element={<NIDVerification />} />
-          <Route path="/profile" element={<ProfilePage />} /> {/* Add ProfilePage route */}
-        </Routes>
-        <Footer />
-      </div>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <div className="min-h-screen bg-white">
+          <Navbar />
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/why-choose-us" element={<WhyChooseUs />} />
+            <Route path="/services" element={<Services />} />
+            <Route path="/testimonials" element={<Testimonials />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/signin" element={<SignIn />} />
+            <Route path="/signup" element={<SignUp />} />
+            <Route path="/nid-verification" element={<NIDVerification />} />
+            <Route path="/profile" element={<ProfilePage />} />
+          </Routes>
+          <Footer />
+        </div>
+      </Router>
+    </AuthProvider>
   );
 }
 
