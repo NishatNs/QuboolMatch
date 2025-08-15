@@ -1,20 +1,28 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const SignUp: React.FC = () => {
   const [ageRange, setAgeRange] = useState({ from: "", to: "" });
+  const navigate = useNavigate();
 
   const handleAgeRangeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setAgeRange((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Simulate sign-up process
+    setTimeout(() => {
+      navigate("/nid-verification"); // Redirect to NID Verification page
+    }, 1000);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="w-full max-w-lg bg-white shadow-lg rounded-lg p-6">
-        <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">
-          Sign Up
-        </h2>
-        <form>
+        <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">Sign Up</h2>
+        <form onSubmit={handleSubmit}>
           {/* Name */}
           <div className="mb-4">
             <label htmlFor="name" className="block text-sm font-medium text-gray-700">
@@ -109,75 +117,27 @@ const SignUp: React.FC = () => {
             />
           </div>
 
-          {/* Preferences Section */}
+          {/* Preferred Age Range */}
           <div className="mb-4">
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">
-              What are you looking for?
-            </h3>
-
-            {/* Bride or Groom */}
-            <div className="mb-4">
-              <label htmlFor="lookingFor" className="block text-sm font-medium text-gray-700">
-                Looking For
-              </label>
-              <select
-                id="lookingFor"
-                className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                <option value="">Select</option>
-                <option value="bride">Bride</option>
-                <option value="groom">Groom</option>
-              </select>
-            </div>
-
-            {/* Age Range */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700">
-                Preferred Age Range
-              </label>
-              <div className="flex space-x-4">
-                <input
-                  type="number"
-                  name="from"
-                  value={ageRange.from}
-                  onChange={handleAgeRangeChange}
-                  className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="From"
-                />
-                <input
-                  type="number"
-                  name="to"
-                  value={ageRange.to}
-                  onChange={handleAgeRangeChange}
-                  className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="To"
-                />
-              </div>
-            </div>
-
-            {/* Profession */}
-            <div className="mb-4">
-              <label htmlFor="profession" className="block text-sm font-medium text-gray-700">
-                Preferred Profession
-              </label>
+            <label className="block text-sm font-medium text-gray-700">
+              Preferred Age Range
+            </label>
+            <div className="flex space-x-4">
               <input
-                type="text"
-                id="profession"
+                type="number"
+                name="from"
+                value={ageRange.from}
+                onChange={handleAgeRangeChange}
                 className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Enter preferred profession"
+                placeholder="From"
               />
-            </div>
-
-            {/* Religion */}
-            <div className="mb-4">
-              <label htmlFor="preferredReligion" className="block text-sm font-medium text-gray-700">
-                Preferred Religion
-              </label>
               <input
-                type="text"
-                id="preferredReligion"
+                type="number"
+                name="to"
+                value={ageRange.to}
+                onChange={handleAgeRangeChange}
                 className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Enter preferred religion"
+                placeholder="To"
               />
             </div>
           </div>
