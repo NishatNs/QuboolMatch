@@ -12,7 +12,9 @@ import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import NIDVerification from "./pages/NIDVerification";
 import ProfilePage from "./pages/ProfilePage";
+import FindMatches from "./pages/FindMatches";
 import { AuthProvider } from "./context/AuthContext";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 function App(): JSX.Element {
   return (
@@ -29,8 +31,21 @@ function App(): JSX.Element {
             <Route path="/contact" element={<Contact />} />
             <Route path="/signin" element={<SignIn />} />
             <Route path="/signup" element={<SignUp />} />
-            <Route path="/nid-verification" element={<NIDVerification />} />
-            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/nid-verification" element={
+              <ProtectedRoute>
+                <NIDVerification />
+              </ProtectedRoute>
+            } />
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            } />
+            <Route path="/find-matches" element={
+              <ProtectedRoute>
+                <FindMatches />
+              </ProtectedRoute>
+            } />
           </Routes>
           <Footer />
         </div>
