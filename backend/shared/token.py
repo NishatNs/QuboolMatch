@@ -1,6 +1,20 @@
 from datetime import datetime, timedelta, timezone
 import jwt
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer
+from sqlalchemy.orm import Session
 from config import get_settings
+from database import get_db
+
+from datetime import datetime, timedelta, timezone
+import jwt
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer
+from sqlalchemy.orm import Session
+from config import get_settings
+from database import get_db
+
+security = HTTPBearer()
 
 class Token:
     @staticmethod
@@ -18,3 +32,38 @@ class Token:
             return None
         except jwt.InvalidTokenError:
             return None
+
+def get_current_user(db: Session = Depends(get_db), token: str = Depends(security)):
+    """
+    Get the current authenticated user from the JWT token
+    """
+    # Import here to avoid circular imports
+    from models.user.user import User
+    
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    try:
+        # Extract token from Bearer token
+        token_str = token.credentials
+        payload = Token.verify_token(token_str)
+        
+        if payload is None:
+            raise credentials_exception
+            
+        user_id: str = payload.get("user_id")
+        if user_id is None:
+            raise credentials_exception
+            
+    except Exception:
+        raise credentials_exception
+    
+    # Get user from database
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise credentials_exception
+        
+    return user
