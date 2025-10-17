@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 interface ProtectedRouteProps {
@@ -8,6 +8,17 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { isLoggedIn } = useAuth();
+  const location = useLocation();
+
+  // For development, allow access to FindMatches, NIDVerification, and Notifications
+  // without requiring authentication
+  if (
+    location.pathname === '/find-matches' || 
+    location.pathname === '/notifications' || 
+    location.pathname === '/nid-verification'
+  ) {
+    return <>{children}</>;
+  }
 
   if (!isLoggedIn) {
     // Redirect to the signin page if not authenticated

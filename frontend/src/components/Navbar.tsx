@@ -40,13 +40,18 @@ const Navbar: React.FC = () => {
           <Link to="/contact" className="text-gray-700 hover:text-indigo-600">
             Contact
           </Link>
+          
+          {/* Always visible links for development */}
+          <Link to="/matches" className="text-gray-700 hover:text-indigo-600">
+            Find Matches
+          </Link>
+          <Link to="/notifications" className="text-gray-700 hover:text-indigo-600">
+            Notifications
+          </Link>
 
           {/* Conditional rendering based on login status */}
           {isLoggedIn ? (
             <>
-              <Link to="/find-matches" className="text-gray-700 hover:text-indigo-600">
-                Find Matches
-              </Link>
               <Link to="/profile" className="text-gray-700 hover:text-indigo-600">
                 Profile
               </Link>

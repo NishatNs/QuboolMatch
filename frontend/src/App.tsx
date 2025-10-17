@@ -13,8 +13,10 @@ import SignUp from "./pages/SignUp";
 import NIDVerification from "./pages/NIDVerification";
 import ProfilePage from "./pages/ProfilePage";
 import FindMatches from "./pages/FindMatches";
+import Notifications from "./pages/Notifications";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+import DevLogin from "./components/DevLogin";
 
 function App(): JSX.Element {
   return (
@@ -22,6 +24,9 @@ function App(): JSX.Element {
       <Router>
         <div className="min-h-screen bg-white">
           <Navbar />
+          {/* Dev Login Helper - Remove in production */}
+          <DevLogin />
+          
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<About />} />
@@ -46,6 +51,10 @@ function App(): JSX.Element {
                 <FindMatches />
               </ProtectedRoute>
             } />
+            {/* Direct access routes for development */}
+            <Route path="/matches" element={<FindMatches />} />
+            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/verify" element={<NIDVerification />} />
           </Routes>
           <Footer />
         </div>
