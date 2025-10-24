@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, R
 from sqlalchemy.orm import Session
 from database import get_db
 from models.user.user import User
-from shared.token import get_current_user
+from shared.token import get_current_user, get_current_admin_user
 from pydantic import BaseModel
 from typing import Optional
 import base64
@@ -117,7 +117,7 @@ async def get_verification_image(
 async def get_user_verification_image(
     user_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_admin: User = Depends(get_current_admin_user)
 ):
     """
     Admin endpoint to get NID image for any user
@@ -157,7 +157,8 @@ async def get_verification_image_base64(
 @router.post("/approve/{user_id}")
 async def approve_verification(
     user_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user)
 ):
     """
     Admin endpoint to approve user verification
@@ -175,7 +176,8 @@ async def approve_verification(
 async def reject_verification(
     user_id: str,
     rejection_notes: str = Form(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user)
 ):
     """
     Admin endpoint to reject user verification
@@ -191,7 +193,8 @@ async def reject_verification(
 
 @router.get("/pending")
 async def get_pending_verifications(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user)
 ):
     """
     Admin endpoint to get all pending verifications

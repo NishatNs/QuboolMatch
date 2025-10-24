@@ -67,3 +67,15 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(securit
         raise credentials_exception
         
     return user
+
+def get_current_admin_user(current_user = Depends(get_current_user)):
+    """
+    Get the current authenticated admin user
+    Raises HTTPException if user is not an admin
+    """
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    return current_user

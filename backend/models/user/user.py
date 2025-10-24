@@ -11,6 +11,7 @@ class User(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     email = Column(String, nullable=False, unique=True)
     hashed_password = Column(String, nullable=False)
+    is_admin = Column(Boolean, default=False, nullable=False)
     is_deleted = Column(Boolean, default=False)
     is_archived = Column(Boolean, default=False)
     created_at = Column(DateTime, default=lambda: datetime.now(
@@ -26,10 +27,11 @@ class User(Base):
     verification_notes = Column(Text, nullable=True)  # Additional notes for verification
     verified_at = Column(DateTime, nullable=True)  # When verification was completed
 
-    def __init__(self, email: String, password: String):
+    def __init__(self, email: String, password: String, is_admin: bool = False):
         self.id = str(uuid.uuid4())
         self.email = email
         self.hashed_password = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+        self.is_admin = is_admin
         self.is_deleted = False
         self.is_archived = False
         self.verification_status = "pending"
@@ -76,4 +78,14 @@ class User(Base):
         self.verification_status = "rejected"
         if notes:
             self.verification_notes = notes
+        return self
+
+    def promote_to_admin(self):
+        """Promote user to admin status"""
+        self.is_admin = True
+        return self
+
+    def demote_from_admin(self):
+        """Remove admin status from user"""
+        self.is_admin = False
         return self
