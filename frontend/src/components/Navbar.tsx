@@ -48,6 +48,11 @@ const Navbar: React.FC = () => {
           <Link to="/notifications" className="text-gray-700 hover:text-indigo-600">
             Notifications
           </Link>
+          
+          {/* Admin Access - Development Only */}
+          <Link to="/admin-login" className="text-red-600 hover:text-red-700 font-medium">
+            Admin
+          </Link>
 
           {/* Conditional rendering based on login status */}
           {isLoggedIn ? (

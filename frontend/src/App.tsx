@@ -1,4 +1,4 @@
-
+﻿
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import Home from "./components/Home";
@@ -15,50 +15,60 @@ import ProfilePage from "./pages/ProfilePage";
 import FindMatches from "./pages/FindMatches";
 import Notifications from "./pages/Notifications";
 import { AuthProvider } from "./context/AuthContext";
+import { AdminProvider } from "./context/AdminContext";
 import ProtectedRoute from "./components/ProtectedRoute";
-import DevLogin from "./components/DevLogin";
+import AdminProtectedRoute from "./components/AdminProtectedRoute";
+import AdminLogin from "./pages/AdminLogin";
+import AdminDashboard from "./pages/AdminDashboard";
+import Layout from "./components/Layout";
 
 function App(): JSX.Element {
   return (
     <AuthProvider>
-      <Router>
-        <div className="min-h-screen bg-white">
-          <Navbar />
-          {/* Dev Login Helper - Remove in production */}
-          <DevLogin />
-          
+      <AdminProvider>
+        <Router>
           <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/why-choose-us" element={<WhyChooseUs />} />
-            <Route path="/services" element={<Services />} />
-            <Route path="/testimonials" element={<Testimonials />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/signin" element={<SignIn />} />
-            <Route path="/signup" element={<SignUp />} />
+            {/* Admin Routes - No navbar/footer */}
+            <Route path="/admin-login" element={<AdminLogin />} />
+            <Route path="/admin-dashboard" element={
+              <AdminProtectedRoute>
+                <AdminDashboard />
+              </AdminProtectedRoute>
+            } />
+
+            {/* Regular App Routes with Layout */}
+            <Route path="/" element={<Layout><Home /></Layout>} />
+            <Route path="/about" element={<Layout><About /></Layout>} />
+            <Route path="/why-choose-us" element={<Layout><WhyChooseUs /></Layout>} />
+            <Route path="/services" element={<Layout><Services /></Layout>} />
+            <Route path="/testimonials" element={<Layout><Testimonials /></Layout>} />
+            <Route path="/contact" element={<Layout><Contact /></Layout>} />
+            <Route path="/signin" element={<Layout><SignIn /></Layout>} />
+            <Route path="/signup" element={<Layout><SignUp /></Layout>} />
+            
             <Route path="/nid-verification" element={
               <ProtectedRoute>
-                <NIDVerification />
+                <Layout><NIDVerification /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/profile" element={
               <ProtectedRoute>
-                <ProfilePage />
+                <Layout><ProfilePage /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/find-matches" element={
               <ProtectedRoute>
-                <FindMatches />
+                <Layout><FindMatches /></Layout>
               </ProtectedRoute>
             } />
+            
             {/* Direct access routes for development */}
-            <Route path="/matches" element={<FindMatches />} />
-            <Route path="/notifications" element={<Notifications />} />
-            <Route path="/verify" element={<NIDVerification />} />
+            <Route path="/matches" element={<Layout><FindMatches /></Layout>} />
+            <Route path="/notifications" element={<Layout><Notifications /></Layout>} />
+            <Route path="/verify" element={<Layout><NIDVerification /></Layout>} />
           </Routes>
-          <Footer />
-        </div>
-      </Router>
+        </Router>
+      </AdminProvider>
     </AuthProvider>
   );
 }
