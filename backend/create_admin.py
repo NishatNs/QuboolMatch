@@ -27,7 +27,15 @@ def create_admin_user(email: str, password: str):
                 return True
         
         # Create new admin user
-        admin_user = User(email=email, password=password, is_admin=True)
+        admin_user = User(
+            name="System Admin",
+            email=email,
+            password=password,
+            gender="Not Specified",
+            nid=f"ADMIN_{email.replace('@', '_').replace('.', '_')}",
+            age=30,
+            is_admin=True
+        )
         db.add(admin_user)
         db.commit()
         print(f"Admin user {email} created successfully!")

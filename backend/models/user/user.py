@@ -1,7 +1,7 @@
 import uuid
 import bcrypt
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Boolean, DateTime, Date, Time, Text, LargeBinary
+from sqlalchemy import Column, String, Boolean, DateTime, Date, Time, Text, LargeBinary, Integer
 from database import Base
 
 
@@ -9,8 +9,21 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    
+    # Basic user information from signup form
+    name = Column(String, nullable=False)
     email = Column(String, nullable=False, unique=True)
     hashed_password = Column(String, nullable=False)
+    gender = Column(String, nullable=False)  # Male/Female/Other
+    nid = Column(String, nullable=False, unique=True)  # National ID number
+    age = Column(Integer, nullable=False)
+    religion = Column(String, nullable=True)
+    
+    # Preferred age range for matching
+    preferred_age_from = Column(Integer, nullable=True)
+    preferred_age_to = Column(Integer, nullable=True)
+    
+    # System fields
     is_admin = Column(Boolean, default=False, nullable=False)
     is_deleted = Column(Boolean, default=False)
     is_archived = Column(Boolean, default=False)
@@ -27,10 +40,19 @@ class User(Base):
     verification_notes = Column(Text, nullable=True)  # Additional notes for verification
     verified_at = Column(DateTime, nullable=True)  # When verification was completed
 
-    def __init__(self, email: String, password: String, is_admin: bool = False):
+    def __init__(self, name: str, email: str, password: str, gender: str, nid: str, age: int, 
+                 religion: str = None, preferred_age_from: int = None, preferred_age_to: int = None, 
+                 is_admin: bool = False):
         self.id = str(uuid.uuid4())
+        self.name = name
         self.email = email
         self.hashed_password = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+        self.gender = gender
+        self.nid = nid
+        self.age = age
+        self.religion = religion
+        self.preferred_age_from = preferred_age_from
+        self.preferred_age_to = preferred_age_to
         self.is_admin = is_admin
         self.is_deleted = False
         self.is_archived = False

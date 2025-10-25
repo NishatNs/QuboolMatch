@@ -6,13 +6,21 @@ from database import get_db
 from repositories.user_repository.user_repository import UserRepository
 from facade import register_user
 from shared.token import Token
+from typing import Optional
 
 router = APIRouter()
 
 
 class UserSignUp(BaseModel):
+    name: str
     email: EmailStr
     password: str
+    gender: str
+    nid: str
+    age: int
+    religion: Optional[str] = None
+    preferred_age_from: Optional[int] = None
+    preferred_age_to: Optional[int] = None
 
 
 @router.post("/sign_up")

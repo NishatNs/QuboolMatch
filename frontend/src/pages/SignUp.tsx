@@ -1,13 +1,27 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const SignUp: React.FC = () => {
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    gender: "",
+    nid: "",
+    age: "",
+    religion: "",
+  });
   const [ageRange, setAgeRange] = useState({ from: "", to: "" });
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+  const { login } = useAuth();
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
 
   const handleAgeRangeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -20,22 +34,38 @@ const SignUp: React.FC = () => {
     setError("");
     
     try {
+      // Prepare the complete signup data
+      const signupData = {
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        gender: formData.gender,
+        nid: formData.nid,
+        age: parseInt(formData.age),
+        religion: formData.religion || null,
+        preferred_age_from: ageRange.from ? parseInt(ageRange.from) : null,
+        preferred_age_to: ageRange.to ? parseInt(ageRange.to) : null,
+      };
+
       // Call backend API for sign up
       const response = await fetch("http://localhost:8000/auth/sign_up", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          email,
-          password,
-        }),
+        body: JSON.stringify(signupData),
       });
       
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.detail || "Failed to sign up");
       }
+      
+      // Create a temporary auth token (in a real app, the backend would provide this)
+      const tempToken = `temp_token_${Date.now()}`;
+      
+      // Log the user in
+      login(tempToken);
       
       // If successful, navigate to the next page
       navigate("/nid-verification");
@@ -60,8 +90,12 @@ const SignUp: React.FC = () => {
             <input
               type="text"
               id="name"
+              name="name"
               className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
               placeholder="Enter your name"
+              value={formData.name}
+              onChange={handleInputChange}
+              required
             />
           </div>
 
@@ -73,10 +107,11 @@ const SignUp: React.FC = () => {
             <input
               type="email"
               id="email"
+              name="email"
               className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
               placeholder="Enter your email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={formData.email}
+              onChange={handleInputChange}
               required
             />
           </div>
@@ -89,10 +124,11 @@ const SignUp: React.FC = () => {
             <input
               type="password"
               id="password"
+              name="password"
               className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
               placeholder="Create a password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              value={formData.password}
+              onChange={handleInputChange}
               required
             />
           </div>
@@ -104,12 +140,16 @@ const SignUp: React.FC = () => {
             </label>
             <select
               id="gender"
+              name="gender"
               className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+              value={formData.gender}
+              onChange={handleInputChange}
+              required
             >
               <option value="">Select Gender</option>
-              <option value="male">Male</option>
-              <option value="female">Female</option>
-              <option value="other">Other</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
             </select>
           </div>
 
@@ -121,8 +161,12 @@ const SignUp: React.FC = () => {
             <input
               type="text"
               id="nid"
+              name="nid"
               className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
               placeholder="Enter your NID"
+              value={formData.nid}
+              onChange={handleInputChange}
+              required
             />
           </div>
 
@@ -134,8 +178,12 @@ const SignUp: React.FC = () => {
             <input
               type="number"
               id="age"
+              name="age"
               className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
               placeholder="Enter your age"
+              value={formData.age}
+              onChange={handleInputChange}
+              required
             />
           </div>
 
@@ -147,8 +195,11 @@ const SignUp: React.FC = () => {
             <input
               type="text"
               id="religion"
+              name="religion"
               className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
               placeholder="Enter your religion"
+              value={formData.religion}
+              onChange={handleInputChange}
             />
           </div>
 
