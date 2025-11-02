@@ -26,8 +26,13 @@ class UserSignUp(BaseModel):
 @router.post("/sign_up")
 async def sign_up(params: UserSignUp, db: Session = Depends(get_db)):
     try:
-        register_user(params, db)
-        return Response(status_code=201)
+        new_user = register_user(params, db)
+        # Generate access token for the new user
+        token = Token.generate_and_sign(user_id=str(new_user.id))
+        return JSONResponse(
+            content={"access_token": token, "token_type": "bearer"}, 
+            status_code=201
+        )
     except Exception as e:
         print(e)
         raise HTTPException(status_code=400, detail=str(e)) from e

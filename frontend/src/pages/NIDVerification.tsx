@@ -1,7 +1,6 @@
 // src/pages/NIDVerification.tsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
 import NIDImageDisplay from "../components/NIDImageDisplay";
 
 const NIDVerification: React.FC = () => {
@@ -9,7 +8,7 @@ const NIDVerification: React.FC = () => {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [notes, setNotes] = useState("");
-  const [status, setStatus] = useState("Verification in Progress");
+  const [status, setStatus] = useState("Not Submitted");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [currentStatus, setCurrentStatus] = useState<any>(null);
@@ -43,11 +42,17 @@ const NIDVerification: React.FC = () => {
             setNotes(statusData.verification_notes);
           }
           
-          // Update status display
+          // Update status display based on verification_status
           if (statusData.verification_status === "verified") {
             setStatus("Verified");
-          } else if (statusData.verification_status === "in_progress") {
-            setStatus("Processing...");
+          } else if (statusData.verification_status === "pending") {
+            setStatus("Verification Pending");
+          } else if (statusData.verification_status === "rejected") {
+            setStatus("Verification Rejected");
+          } else if (statusData.verification_status === "not_submitted") {
+            setStatus("Not Submitted");
+          } else {
+            setStatus("Not Submitted");
           }
         }
       } catch (error) {
@@ -68,7 +73,7 @@ const NIDVerification: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError("");
-    setStatus("Processing...");
+    setStatus("Submitting...");
 
     try {
       // Validate form data
@@ -114,11 +119,18 @@ const NIDVerification: React.FC = () => {
       const data = await response.json();
       
       if (data.success) {
-        setStatus("Verified");
-        // After successful submission, redirect to profile page
-        setTimeout(() => {
-          navigate("/profile");
-        }, 2000);
+        // Set status to pending - waiting for admin verification
+        setStatus("Verification Pending");
+        // Refresh the status from server
+        const statusResponse = await fetch("http://localhost:8000/verification/status", {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        });
+        if (statusResponse.ok) {
+          const statusData = await statusResponse.json();
+          setCurrentStatus(statusData);
+        }
       } else {
         throw new Error(data.message || "Verification submission failed");
       }
@@ -126,7 +138,7 @@ const NIDVerification: React.FC = () => {
     } catch (err) {
       console.error("Verification submission error:", err);
       setError(err instanceof Error ? err.message : "An error occurred during verification submission");
-      setStatus("Verification in Progress"); // Reset status on error
+      setStatus("Not Submitted"); // Reset status on error
     } finally {
       setLoading(false);
     }
@@ -218,11 +230,13 @@ const NIDVerification: React.FC = () => {
             <h3 className="text-lg font-semibold text-gray-800">Verification Status</h3>
             <div className={`mt-2 p-3 rounded-md ${
               status === "Verified" ? "bg-green-100 text-green-800" : 
-              status === "Processing..." ? "bg-blue-100 text-blue-800" :
-              "bg-yellow-100 text-yellow-800"
+              status === "Verification Pending" ? "bg-yellow-100 text-yellow-800" :
+              status === "Verification Rejected" ? "bg-red-100 text-red-800" :
+              status === "Submitting..." ? "bg-blue-100 text-blue-800" :
+              "bg-gray-100 text-gray-800"
             }`}>
               <p className="text-sm font-medium flex items-center">
-                {status === "Processing..." && (
+                {status === "Submitting..." && (
                   <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -233,14 +247,46 @@ const NIDVerification: React.FC = () => {
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
                 )}
+                {status === "Verification Pending" && (
+                  <svg className="h-4 w-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                  </svg>
+                )}
                 {status}
               </p>
+              
+              {/* Show message based on status */}
+              {status === "Not Submitted" && (
+                <p className="text-xs mt-2 opacity-90">
+                  Please fill out the form and upload your NID image to submit for verification.
+                </p>
+              )}
+              {status === "Verification Pending" && (
+                <p className="text-xs mt-2 opacity-90">
+                  Your verification request has been submitted successfully. Please wait for admin approval.
+                </p>
+              )}
+              {status === "Verified" && currentStatus?.verified_at && (
+                <p className="text-xs mt-2 opacity-90">
+                  Verified on {new Date(currentStatus.verified_at).toLocaleString()}
+                </p>
+              )}
+              {status === "Verification Rejected" && (
+                <p className="text-xs mt-2 opacity-90">
+                  Your verification was rejected. Please resubmit with correct information.
+                  {currentStatus?.verification_notes && (
+                    <span className="block mt-1 font-medium">
+                      Reason: {currentStatus.verification_notes}
+                    </span>
+                  )}
+                </p>
+              )}
               
               {/* Show existing verification details if available */}
               {currentStatus && currentStatus.verification_date && (
                 <div className="mt-3 pt-3 border-t border-opacity-20 border-gray-500">
                   <p className="text-xs opacity-75">
-                    Previously submitted: {currentStatus.verification_date}
+                    Scheduled date: {currentStatus.verification_date}
                     {currentStatus.verification_time && ` at ${currentStatus.verification_time}`}
                   </p>
                   {currentStatus.verification_notes && (
@@ -258,13 +304,13 @@ const NIDVerification: React.FC = () => {
             <button
               type="submit"
               className={`w-full py-2 px-4 rounded-md transition ${
-                loading || status === "Processing..." 
+                loading || status === "Submitting..." || status === "Verification Pending"
                   ? "bg-gray-400 cursor-not-allowed" 
                   : "bg-indigo-600 hover:bg-indigo-700"
               } text-white`}
-              disabled={loading || status === "Processing..."}
+              disabled={loading || status === "Submitting..." || status === "Verification Pending"}
             >
-              {loading || status === "Processing..." ? (
+              {loading || status === "Submitting..." ? (
                 <span className="flex items-center justify-center">
                   <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -272,6 +318,10 @@ const NIDVerification: React.FC = () => {
                   </svg>
                   Submitting...
                 </span>
+              ) : status === "Verification Pending" ? (
+                "Request Submitted - Awaiting Admin Approval"
+              ) : status === "Verification Rejected" ? (
+                "Resubmit Verification"
               ) : (
                 "Submit Verification"
               )}

@@ -36,7 +36,7 @@ class User(Base):
     nid_image_content_type = Column(String, nullable=True)  # MIME type (image/jpeg, etc.)
     verification_date = Column(Date, nullable=True)  # Scheduled verification date
     verification_time = Column(Time, nullable=True)  # Scheduled verification time
-    verification_status = Column(String, default="pending")  # pending, in_progress, verified, rejected
+    verification_status = Column(String, default="not_submitted")  # not_submitted, pending, verified, rejected
     verification_notes = Column(Text, nullable=True)  # Additional notes for verification
     verified_at = Column(DateTime, nullable=True)  # When verification was completed
 
@@ -56,7 +56,7 @@ class User(Base):
         self.is_admin = is_admin
         self.is_deleted = False
         self.is_archived = False
-        self.verification_status = "pending"
+        self.verification_status = "not_submitted"
 
     def check_password(self, password: str) -> bool:
         return bcrypt.checkpw(password.encode(), self.hashed_password.encode())
@@ -88,7 +88,8 @@ class User(Base):
             self.verification_time = verification_time
         if verification_notes:
             self.verification_notes = verification_notes
-        self.verification_status = "in_progress"
+        # Keep status as pending until admin verifies
+        self.verification_status = "pending"
         return self
 
     def verify(self):

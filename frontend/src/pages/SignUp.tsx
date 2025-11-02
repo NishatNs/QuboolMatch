@@ -61,13 +61,13 @@ const SignUp: React.FC = () => {
         throw new Error(errorData.detail || "Failed to sign up");
       }
       
-      // Create a temporary auth token (in a real app, the backend would provide this)
-      const tempToken = `temp_token_${Date.now()}`;
+      // Get the access token from the response
+      const data = await response.json();
       
-      // Log the user in
-      login(tempToken);
+      // Log the user in with the real token
+      login(data.access_token);
       
-      // If successful, navigate to the next page
+      // Navigate directly to NID verification page
       navigate("/nid-verification");
     } catch (err) {
       console.error("Signup error:", err);

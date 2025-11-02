@@ -15,6 +15,12 @@ def test_sign_up_success(client):
     
     response = client.post("/auth/sign_up", json=payload)
     assert response.status_code == 201  # Status code 201 for successful creation
+    
+    # Verify that the response contains an access token
+    data = response.json()
+    assert "access_token" in data
+    assert "token_type" in data
+    assert data["token_type"] == "bearer"
 
 
 # Test sign_up failure (email already exists)
