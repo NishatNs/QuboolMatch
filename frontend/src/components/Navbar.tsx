@@ -42,6 +42,9 @@ const Navbar: React.FC = () => {
           </Link>
           
           {/* Always visible links for development */}
+          <Link to="/nid-verification" className="text-gray-700 hover:text-indigo-600">
+            Verification
+          </Link>
           <Link to="/matches" className="text-gray-700 hover:text-indigo-600">
             Find Matches
           </Link>

@@ -58,7 +58,55 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(securit
         if user_id is None:
             raise credentials_exception
             
-    except Exception:
+    except AttributeError as e:
+        print(f"Token attribute error: {e}")
+        raise credentials_exception
+    except Exception as e:
+        print(f"Authentication error: {e}")
+        raise credentials_exception
+    
+    # Get user from database
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise credentials_exception
+        
+    return user
+
+# Alternative simpler authentication function for profile endpoints
+def get_current_user_from_header(authorization: str = Depends(lambda: None), db: Session = Depends(get_db)):
+    """
+    Get the current authenticated user from Authorization header
+    This is a simpler alternative that directly reads the header
+    """
+    from fastapi import Header, Request
+    from models.user.user import User
+    
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    if not authorization:
+        raise credentials_exception
+    
+    try:
+        # Extract token from "Bearer <token>"
+        if not authorization.startswith("Bearer "):
+            raise credentials_exception
+        
+        token_str = authorization.split(" ")[1]
+        payload = Token.verify_token(token_str)
+        
+        if payload is None:
+            raise credentials_exception
+            
+        user_id: str = payload.get("user_id")
+        if user_id is None:
+            raise credentials_exception
+            
+    except Exception as e:
+        print(f"Authentication error: {e}")
         raise credentials_exception
     
     # Get user from database

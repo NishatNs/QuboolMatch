@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 // Define interface for the lifestyle preferences
 interface LifestylePreferences {
@@ -225,11 +225,181 @@ const ProfilePage: React.FC = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Profile Saved:", profile);
-    alert("Profile information saved successfully!");
+    
+    try {
+      const token = localStorage.getItem('accessToken');
+      
+      if (!token) {
+        alert('Please sign in first');
+        return;
+      }
+
+      // Transform the frontend profile data to match the backend API format
+      const profileData = {
+        location: profile.location,
+        academic_background: profile.academicBackground,
+        profession: profile.profession,
+        marital_status: profile.maritalStatus,
+        hobbies: profile.hobbies,
+        intro_video: profile.introVideo,
+        medical_history: profile.medicalHistory,
+        overall_health_status: profile.overallHealthStatus,
+        long_term_condition: profile.longTermCondition,
+        long_term_condition_description: profile.longTermConditionDescription,
+        blood_group: profile.bloodGroup,
+        genetic_conditions: profile.geneticConditions,
+        fertility_awareness: profile.fertilityAwareness,
+        disability: profile.disability,
+        disability_description: profile.disabilityDescription,
+        medical_documents: profile.medicalDocuments,
+        height: parseFloat(profile.height) || null,
+        weight: parseFloat(profile.weight) || null,
+        dietary_preference: profile.dietaryPreference,
+        smoking_habit: profile.smokingHabit,
+        alcohol_consumption: profile.alcoholConsumption,
+        chronic_illness: profile.chronicIllness,
+        interests: profile.interests,
+        profile_picture: profile.profilePicture,
+        preferred_age_min: parseInt(profile.preferredAgeMin) || null,
+        preferred_age_max: parseInt(profile.preferredAgeMax) || null,
+        preferred_height_min: parseFloat(profile.preferredHeightMin) || null,
+        preferred_height_max: parseFloat(profile.preferredHeightMax) || null,
+        preferred_weight_min: parseFloat(profile.preferredWeightMin) || null,
+        preferred_weight_max: parseFloat(profile.preferredWeightMax) || null,
+        preferred_religion: profile.preferredReligion,
+        preferred_education: profile.preferredEducation,
+        preferred_profession: profile.preferredProfession,
+        preferred_location: profile.preferredLocation,
+        specific_location: profile.specificLocation || null,
+        willing_to_relocate: profile.willingToRelocate,
+        lifestyle_pref_smoking: profile.lifestylePreferences.smoking,
+        lifestyle_pref_alcohol: profile.lifestylePreferences.alcohol,
+        lifestyle_pref_dietary_match: profile.lifestylePreferences.dietaryMatch,
+        living_with_in_laws: profile.livingWithInLaws,
+        career_support_expectations: profile.careerSupportExpectations,
+        necessary_preferences: profile.necessaryPreferences,
+        additional_comments: profile.additionalComments,
+        is_completed: true
+      };
+
+      // Try to update first (if profile exists), otherwise create
+      let response = await fetch('http://localhost:8000/api/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(profileData)
+      });
+
+      // If update fails with 404, try creating new profile
+      if (response.status === 404) {
+        response = await fetch('http://localhost:8000/api/profile', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(profileData)
+        });
+      }
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to save profile');
+      }
+
+      const result = await response.json();
+      console.log("Profile Saved:", result);
+      alert("Profile information saved successfully!");
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      alert(`Failed to save profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
+
+  // Load existing profile on component mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        
+        if (!token) {
+          return; // User not logged in
+        }
+
+        const response = await fetch('http://localhost:8000/api/profile', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Transform backend data to frontend format
+          setProfile({
+            name: data.name || '',
+            age: data.age || '',
+            gender: data.gender || '',
+            location: data.location || '',
+            academicBackground: data.academic_background || '',
+            profession: data.profession || '',
+            maritalStatus: data.marital_status || '',
+            religion: data.religion || '',
+            hobbies: data.hobbies || '',
+            introVideo: data.intro_video || '',
+            medicalHistory: data.medical_history || '',
+            overallHealthStatus: data.overall_health_status || '',
+            longTermCondition: data.long_term_condition || '',
+            longTermConditionDescription: data.long_term_condition_description || '',
+            bloodGroup: data.blood_group || '',
+            geneticConditions: data.genetic_conditions || [],
+            fertilityAwareness: data.fertility_awareness || '',
+            disability: data.disability || '',
+            disabilityDescription: data.disability_description || '',
+            medicalDocuments: data.medical_documents || '',
+            height: data.height?.toString() || '',
+            weight: data.weight?.toString() || '',
+            dietaryPreference: data.dietary_preference || '',
+            smokingHabit: data.smoking_habit || '',
+            alcoholConsumption: data.alcohol_consumption || '',
+            chronicIllness: data.chronic_illness || '',
+            interests: data.interests || '',
+            profilePicture: data.profile_picture || '',
+            preferredAgeMin: data.preferred_age_min?.toString() || '',
+            preferredAgeMax: data.preferred_age_max?.toString() || '',
+            preferredHeightMin: data.preferred_height_min?.toString() || '',
+            preferredHeightMax: data.preferred_height_max?.toString() || '',
+            preferredWeightMin: data.preferred_weight_min?.toString() || '',
+            preferredWeightMax: data.preferred_weight_max?.toString() || '',
+            preferredReligion: data.preferred_religion || '',
+            preferredEducation: data.preferred_education || '',
+            preferredProfession: data.preferred_profession || '',
+            preferredLocation: data.preferred_location || '',
+            specificLocation: data.specific_location || '',
+            willingToRelocate: data.willing_to_relocate || false,
+            lifestylePreferences: {
+              smoking: data.lifestyle_pref_smoking || '',
+              alcohol: data.lifestyle_pref_alcohol || '',
+              dietaryMatch: data.lifestyle_pref_dietary_match || false
+            },
+            livingWithInLaws: data.living_with_in_laws || '',
+            careerSupportExpectations: data.career_support_expectations || '',
+            necessaryPreferences: data.necessary_preferences || [],
+            additionalComments: data.additional_comments || ''
+          });
+        }
+      } catch (error) {
+        console.error('Error loading profile:', error);
+      }
+    };
+
+    loadProfile();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-100 py-8">
