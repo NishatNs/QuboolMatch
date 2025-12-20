@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, status, Header
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from typing import Optional, List
 from database import get_db
@@ -8,6 +8,8 @@ from repositories.profile_repository.profile_repository import ProfileRepository
 from shared.token import Token
 from models.user.user import User
 import json
+import base64
+import re
 
 router = APIRouter()
 
@@ -51,6 +53,37 @@ def get_current_user_id(authorization: str = Header(None), db: Session = Depends
     return user_id
 
 
+def process_base64_file(base64_data: str) -> tuple:
+    """
+    Convert base64 data URL to binary data
+    Returns: (binary_data, filename, content_type)
+    """
+    if not base64_data or not base64_data.startswith('data:'):
+        return None, None, None
+    
+    try:
+        # Extract content type and base64 data
+        # Format: data:image/png;base64,iVBORw0KGgoAAAANS...
+        match = re.match(r'data:([^;]+);base64,(.+)', base64_data)
+        if not match:
+            return None, None, None
+        
+        content_type = match.group(1)
+        base64_content = match.group(2)
+        
+        # Decode base64 to binary
+        binary_data = base64.b64decode(base64_content)
+        
+        # Generate filename based on content type
+        extension = content_type.split('/')[-1]
+        filename = f"file.{extension}"
+        
+        return binary_data, filename, content_type
+    except Exception as e:
+        print(f"Error processing base64 file: {e}")
+        return None, None, None
+
+
 class ProfileCreate(BaseModel):
     # Personal Information
     location: Optional[str] = None
@@ -66,7 +99,7 @@ class ProfileCreate(BaseModel):
     long_term_condition: Optional[str] = None
     long_term_condition_description: Optional[str] = None
     blood_group: Optional[str] = None
-    genetic_conditions: Optional[List[str]] = None
+    genetic_conditions: Optional[str] = None  # Accept as string (JSON)
     fertility_awareness: Optional[str] = None
     disability: Optional[str] = None
     disability_description: Optional[str] = None
@@ -107,7 +140,7 @@ class ProfileCreate(BaseModel):
     
     living_with_in_laws: Optional[str] = None
     career_support_expectations: Optional[str] = None
-    necessary_preferences: Optional[List[str]] = None
+    necessary_preferences: Optional[str] = None  # Accept as string (JSON)
     additional_comments: Optional[str] = None
 
 
@@ -130,12 +163,31 @@ async def create_profile(
         if existing_profile:
             raise HTTPException(status_code=400, detail="Profile already exists")
         
-        # Convert list fields to JSON strings
+        # Get profile data
         profile_dict = profile_data.dict()
-        if profile_dict.get('genetic_conditions'):
-            profile_dict['genetic_conditions'] = json.dumps(profile_dict['genetic_conditions'])
-        if profile_dict.get('necessary_preferences'):
-            profile_dict['necessary_preferences'] = json.dumps(profile_dict['necessary_preferences'])
+        # genetic_conditions and necessary_preferences are already strings from frontend
+        
+        # Process base64 files
+        if profile_dict.get('profile_picture'):
+            data, filename, content_type = process_base64_file(profile_dict.pop('profile_picture'))
+            if data:
+                profile_dict['profile_picture_data'] = data
+                profile_dict['profile_picture_filename'] = filename
+                profile_dict['profile_picture_content_type'] = content_type
+        
+        if profile_dict.get('intro_video'):
+            data, filename, content_type = process_base64_file(profile_dict.pop('intro_video'))
+            if data:
+                profile_dict['intro_video_data'] = data
+                profile_dict['intro_video_filename'] = filename
+                profile_dict['intro_video_content_type'] = content_type
+        
+        if profile_dict.get('medical_documents'):
+            data, filename, content_type = process_base64_file(profile_dict.pop('medical_documents'))
+            if data:
+                profile_dict['medical_documents_data'] = data
+                profile_dict['medical_documents_filename'] = filename
+                profile_dict['medical_documents_content_type'] = content_type
         
         # Create profile
         profile = ProfileRepository.create(db, user_id, **profile_dict)
@@ -188,12 +240,31 @@ async def update_profile(
         if not profile:
             raise HTTPException(status_code=404, detail="Profile not found")
         
-        # Convert list fields to JSON strings
+        # Get profile data
         profile_dict = profile_data.dict(exclude_unset=True)
-        if 'genetic_conditions' in profile_dict and profile_dict['genetic_conditions']:
-            profile_dict['genetic_conditions'] = json.dumps(profile_dict['genetic_conditions'])
-        if 'necessary_preferences' in profile_dict and profile_dict['necessary_preferences']:
-            profile_dict['necessary_preferences'] = json.dumps(profile_dict['necessary_preferences'])
+        # genetic_conditions and necessary_preferences are already strings from frontend
+        
+        # Process base64 files
+        if 'profile_picture' in profile_dict and profile_dict['profile_picture']:
+            data, filename, content_type = process_base64_file(profile_dict.pop('profile_picture'))
+            if data:
+                profile_dict['profile_picture_data'] = data
+                profile_dict['profile_picture_filename'] = filename
+                profile_dict['profile_picture_content_type'] = content_type
+        
+        if 'intro_video' in profile_dict and profile_dict['intro_video']:
+            data, filename, content_type = process_base64_file(profile_dict.pop('intro_video'))
+            if data:
+                profile_dict['intro_video_data'] = data
+                profile_dict['intro_video_filename'] = filename
+                profile_dict['intro_video_content_type'] = content_type
+        
+        if 'medical_documents' in profile_dict and profile_dict['medical_documents']:
+            data, filename, content_type = process_base64_file(profile_dict.pop('medical_documents'))
+            if data:
+                profile_dict['medical_documents_data'] = data
+                profile_dict['medical_documents_filename'] = filename
+                profile_dict['medical_documents_content_type'] = content_type
         
         # Update profile
         updated_profile = ProfileRepository.update(db, profile, **profile_dict)
@@ -272,4 +343,73 @@ async def get_profile_by_user_id(
         raise
     except Exception as e:
         print(f"Error fetching profile: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/profile/picture/{user_id}")
+async def get_profile_picture(
+    user_id: str,
+    db: Session = Depends(get_db)
+):
+    """Get profile picture for a user"""
+    try:
+        profile = ProfileRepository.get_by_user_id(db, user_id)
+        
+        if not profile or not profile.profile_picture_data:
+            raise HTTPException(status_code=404, detail="Profile picture not found")
+        
+        return Response(
+            content=profile.profile_picture_data,
+            media_type=profile.profile_picture_content_type or "image/jpeg"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching profile picture: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/profile/video/{user_id}")
+async def get_intro_video(
+    user_id: str,
+    db: Session = Depends(get_db)
+):
+    """Get intro video for a user"""
+    try:
+        profile = ProfileRepository.get_by_user_id(db, user_id)
+        
+        if not profile or not profile.intro_video_data:
+            raise HTTPException(status_code=404, detail="Intro video not found")
+        
+        return Response(
+            content=profile.intro_video_data,
+            media_type=profile.intro_video_content_type or "video/mp4"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching intro video: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/profile/documents/{user_id}")
+async def get_medical_documents(
+    user_id: str,
+    db: Session = Depends(get_db)
+):
+    """Get medical documents for a user"""
+    try:
+        profile = ProfileRepository.get_by_user_id(db, user_id)
+        
+        if not profile or not profile.medical_documents_data:
+            raise HTTPException(status_code=404, detail="Medical documents not found")
+        
+        return Response(
+            content=profile.medical_documents_data,
+            media_type=profile.medical_documents_content_type or "application/pdf"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching medical documents: {e}")
         raise HTTPException(status_code=500, detail=str(e))

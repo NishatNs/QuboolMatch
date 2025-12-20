@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Boolean, DateTime, Integer, Text, Float, ForeignKey, ARRAY
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, Text, Float, ForeignKey, LargeBinary
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -17,7 +17,11 @@ class Profile(Base):
     profession = Column(String, nullable=True)
     marital_status = Column(String, nullable=True)
     hobbies = Column(Text, nullable=True)
-    intro_video = Column(String, nullable=True)  # URL to video
+    
+    # Intro Video - stored as binary
+    intro_video_data = Column(LargeBinary, nullable=True)
+    intro_video_filename = Column(String, nullable=True)
+    intro_video_content_type = Column(String, nullable=True)
     
     # Health Information
     medical_history = Column(Text, nullable=True)
@@ -29,7 +33,11 @@ class Profile(Base):
     fertility_awareness = Column(String, nullable=True)
     disability = Column(String, nullable=True)  # yes/no
     disability_description = Column(Text, nullable=True)
-    medical_documents = Column(String, nullable=True)  # URL to uploaded documents
+    
+    # Medical Documents - stored as binary
+    medical_documents_data = Column(LargeBinary, nullable=True)
+    medical_documents_filename = Column(String, nullable=True)
+    medical_documents_content_type = Column(String, nullable=True)
     
     # Physical Attributes
     height = Column(Float, nullable=True)  # in cm
@@ -42,8 +50,10 @@ class Profile(Base):
     chronic_illness = Column(String, nullable=True)
     interests = Column(Text, nullable=True)
     
-    # Profile Picture
-    profile_picture = Column(String, nullable=True)  # URL to profile picture
+    # Profile Picture - stored as binary
+    profile_picture_data = Column(LargeBinary, nullable=True)
+    profile_picture_filename = Column(String, nullable=True)
+    profile_picture_content_type = Column(String, nullable=True)
     
     # Partner and Marriage Preferences
     preferred_age_min = Column(Integer, nullable=True)
@@ -112,7 +122,8 @@ class Profile(Base):
             'profession': self.profession,
             'marital_status': self.marital_status,
             'hobbies': self.hobbies,
-            'intro_video': self.intro_video,
+            'has_intro_video': bool(self.intro_video_data),
+            'intro_video_filename': self.intro_video_filename,
             'medical_history': self.medical_history,
             'overall_health_status': self.overall_health_status,
             'long_term_condition': self.long_term_condition,
@@ -122,7 +133,8 @@ class Profile(Base):
             'fertility_awareness': self.fertility_awareness,
             'disability': self.disability,
             'disability_description': self.disability_description,
-            'medical_documents': self.medical_documents,
+            'has_medical_documents': bool(self.medical_documents_data),
+            'medical_documents_filename': self.medical_documents_filename,
             'height': self.height,
             'weight': self.weight,
             'dietary_preference': self.dietary_preference,
@@ -130,7 +142,8 @@ class Profile(Base):
             'alcohol_consumption': self.alcohol_consumption,
             'chronic_illness': self.chronic_illness,
             'interests': self.interests,
-            'profile_picture': self.profile_picture,
+            'has_profile_picture': bool(self.profile_picture_data),
+            'profile_picture_filename': self.profile_picture_filename,
             'preferred_age_min': self.preferred_age_min,
             'preferred_age_max': self.preferred_age_max,
             'preferred_height_min': self.preferred_height_min,

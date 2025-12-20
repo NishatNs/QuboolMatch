@@ -225,6 +225,21 @@ const ProfilePage: React.FC = () => {
     }
   };
 
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      
+      reader.onload = () => {
+        if (reader.result) {
+          setProfile((prev) => ({ ...prev, introVideo: reader.result as string }));
+        }
+      };
+      
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -340,6 +355,24 @@ const ProfilePage: React.FC = () => {
         if (response.ok) {
           const data = await response.json();
           
+          // Load profile picture if available
+          let profilePictureData = '';
+          if (data.has_profile_picture && data.user_id) {
+            try {
+              const imgResponse = await fetch(`http://localhost:8000/api/profile/picture/${data.user_id}`);
+              if (imgResponse.ok) {
+                const blob = await imgResponse.blob();
+                profilePictureData = await new Promise((resolve) => {
+                  const reader = new FileReader();
+                  reader.onloadend = () => resolve(reader.result as string);
+                  reader.readAsDataURL(blob);
+                });
+              }
+            } catch (err) {
+              console.error('Error loading profile picture:', err);
+            }
+          }
+          
           // Transform backend data to frontend format
           setProfile({
             name: data.name || '',
@@ -351,7 +384,7 @@ const ProfilePage: React.FC = () => {
             maritalStatus: data.marital_status || '',
             religion: data.religion || '',
             hobbies: data.hobbies || '',
-            introVideo: data.intro_video || '',
+            introVideo: '', // Video needs separate handling
             medicalHistory: data.medical_history || '',
             overallHealthStatus: data.overall_health_status || '',
             longTermCondition: data.long_term_condition || '',
@@ -361,7 +394,7 @@ const ProfilePage: React.FC = () => {
             fertilityAwareness: data.fertility_awareness || '',
             disability: data.disability || '',
             disabilityDescription: data.disability_description || '',
-            medicalDocuments: data.medical_documents || '',
+            medicalDocuments: '', // Documents need separate handling
             height: data.height?.toString() || '',
             weight: data.weight?.toString() || '',
             dietaryPreference: data.dietary_preference || '',
@@ -369,7 +402,7 @@ const ProfilePage: React.FC = () => {
             alcoholConsumption: data.alcohol_consumption || '',
             chronicIllness: data.chronic_illness || '',
             interests: data.interests || '',
-            profilePicture: data.profile_picture || '',
+            profilePicture: profilePictureData,
             preferredAgeMin: data.preferred_age_min?.toString() || '',
             preferredAgeMax: data.preferred_age_max?.toString() || '',
             preferredHeightMin: data.preferred_height_min?.toString() || '',
@@ -414,7 +447,11 @@ const ProfilePage: React.FC = () => {
           />
 
           {/* Personal Info Section */}
-          <PersonalInfoSection profile={profile} onInputChange={handleInputChange} />
+          <PersonalInfoSection 
+            profile={profile} 
+            onInputChange={handleInputChange}
+            onVideoUpload={handleVideoUpload}
+          />
           
           {/* Partner Preferences Section */}
           <PartnerPreferencesSection profile={profile} onInputChange={handleInputChange} />
@@ -520,19 +557,8 @@ const ProfileHeader: React.FC<{
 const PersonalInfoSection: React.FC<{
   profile: ProfileData;
   onInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
-}> = ({ profile, onInputChange }) => {
-  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      // For now just store the filename, in a real app you'd upload to server
-      // and store URL
-      const fileName = file.name;
-      onInputChange({
-        target: { name: 'introVideo', value: fileName }
-      } as React.ChangeEvent<HTMLInputElement>);
-    }
-  };
-
+  onVideoUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}> = ({ profile, onInputChange, onVideoUpload }) => {
   return (
     <div className="mb-6">
       <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Personal Information</h2>
@@ -628,11 +654,11 @@ const PersonalInfoSection: React.FC<{
               type="file"
               id="introVideo"
               accept="video/*"
-              onChange={handleVideoUpload}
+              onChange={onVideoUpload}
               className="hidden"
             />
             <span className="ml-3 text-sm text-gray-500">
-              {profile.introVideo ? profile.introVideo : "No video uploaded yet"}
+              {profile.introVideo ? "Video uploaded ✓" : "No video uploaded yet"}
             </span>
           </div>
           <p className="mt-1 text-sm text-gray-500">
@@ -947,25 +973,24 @@ const PersonalInfoSection: React.FC<{
                   name="medicalDocuments"
                   onChange={(e) => {
                     if (e.target.files && e.target.files[0]) {
-                      // Use custom event to work with onInputChange
                       const file = e.target.files[0];
-                      const fileName = file.name;
-                      // Create a custom event object compatible with onInputChange
-                      const customEvent = {
-                        target: { 
-                          name: 'medicalDocuments', 
-                          value: fileName 
-                        }
-                      } as React.ChangeEvent<HTMLInputElement>;
+                      const reader = new FileReader();
                       
-                      onInputChange(customEvent);
+                      reader.onload = () => {
+                        if (reader.result) {
+                          // Store base64 data
+                          setProfile((prev) => ({ ...prev, medicalDocuments: reader.result as string }));
+                        }
+                      };
+                      
+                      reader.readAsDataURL(file);
                     }
                   }}
                   className="hidden"
                   accept=".pdf,.jpg,.jpeg,.png"
                 />
                 <span className="ml-3 text-sm text-gray-500">
-                  {profile.medicalDocuments ? profile.medicalDocuments : "No document uploaded"}
+                  {profile.medicalDocuments ? "Document uploaded ✓" : "No document uploaded"}
                 </span>
               </div>
               <p className="mt-1 text-xs text-gray-500">

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { Button, Input, Select, Card } from "../components/ui";
 
 const SignUp: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -78,172 +79,182 @@ const SignUp: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="w-full max-w-lg bg-white shadow-lg rounded-lg p-6">
-        <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">Sign Up</h2>
-        <form onSubmit={handleSubmit}>
-          {/* Name */}
-          <div className="mb-4">
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-              Name
-            </label>
-            <input
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-accent-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-2xl">
+        {/* Logo & Header */}
+        <div className="text-center mb-8 animate-fade-in">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary-600 to-accent-600 rounded-2xl shadow-lg mb-4">
+            <span className="text-white font-bold text-2xl">Q</span>
+          </div>
+          <h2 className="text-3xl font-heading font-bold bg-gradient-to-r from-primary-700 to-accent-700 bg-clip-text text-transparent">
+            Create Your Account
+          </h2>
+          <p className="mt-2 text-gray-600">
+            Start your journey to find your perfect match
+          </p>
+        </div>
+
+        {/* Sign Up Card */}
+        <Card className="animate-slide-up" padding="lg">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Name */}
+            <Input
               type="text"
-              id="name"
               name="name"
-              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Enter your name"
+              label="Full Name"
+              placeholder="Enter your full name"
               value={formData.name}
               onChange={handleInputChange}
               required
+              icon={
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              }
             />
-          </div>
 
-          {/* Email */}
-          <div className="mb-4">
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-              Email
-            </label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Enter your email"
-              value={formData.email}
-              onChange={handleInputChange}
-              required
-            />
-          </div>
+            {/* Email & Password Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <Input
+                type="email"
+                name="email"
+                label="Email Address"
+                placeholder="your@email.com"
+                value={formData.email}
+                onChange={handleInputChange}
+                required
+                icon={
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                  </svg>
+                }
+              />
 
-          {/* Password */}
-          <div className="mb-4">
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              Password
-            </label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Create a password"
-              value={formData.password}
-              onChange={handleInputChange}
-              required
-            />
-          </div>
+              <Input
+                type="password"
+                name="password"
+                label="Password"
+                placeholder="Create a strong password"
+                value={formData.password}
+                onChange={handleInputChange}
+                required
+                icon={
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                }
+              />
+            </div>
 
-          {/* Gender */}
-          <div className="mb-4">
-            <label htmlFor="gender" className="block text-sm font-medium text-gray-700">
-              Gender
-            </label>
-            <select
-              id="gender"
-              name="gender"
-              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-              value={formData.gender}
-              onChange={handleInputChange}
-              required
+            {/* Gender & Age Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <Select
+                name="gender"
+                label="Gender"
+                value={formData.gender}
+                onChange={handleInputChange}
+                required
+                options={[
+                  { value: "", label: "Select Gender" },
+                  { value: "Male", label: "Male" },
+                  { value: "Female", label: "Female" },
+                  { value: "Other", label: "Other" },
+                ]}
+              />
+
+              <Input
+                type="number"
+                name="age"
+                label="Age"
+                placeholder="Your age"
+                value={formData.age}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
+
+            {/* NID & Religion Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <Input
+                type="text"
+                name="nid"
+                label="National ID (NID)"
+                placeholder="Enter your NID number"
+                value={formData.nid}
+                onChange={handleInputChange}
+                required
+                icon={
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
+                  </svg>
+                }
+              />
+
+              <Input
+                type="text"
+                name="religion"
+                label="Religion (Optional)"
+                placeholder="Your religion"
+                value={formData.religion}
+                onChange={handleInputChange}
+              />
+            </div>
+
+            {/* Preferred Age Range */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Preferred Age Range
+              </label>
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  type="number"
+                  name="from"
+                  placeholder="From"
+                  value={ageRange.from}
+                  onChange={handleAgeRangeChange}
+                />
+                <Input
+                  type="number"
+                  name="to"
+                  placeholder="To"
+                  value={ageRange.to}
+                  onChange={handleAgeRangeChange}
+                />
+              </div>
+            </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded-lg animate-scale-in">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-red-700 text-sm font-medium">{error}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              isLoading={loading}
+              className="w-full"
             >
-              <option value="">Select Gender</option>
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
+              {loading ? "Creating Account..." : "Create Account"}
+            </Button>
+          </form>
+        </Card>
 
-          {/* NID */}
-          <div className="mb-4">
-            <label htmlFor="nid" className="block text-sm font-medium text-gray-700">
-              NID (National ID)
-            </label>
-            <input
-              type="text"
-              id="nid"
-              name="nid"
-              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Enter your NID"
-              value={formData.nid}
-              onChange={handleInputChange}
-              required
-            />
-          </div>
-
-          {/* Age */}
-          <div className="mb-4">
-            <label htmlFor="age" className="block text-sm font-medium text-gray-700">
-              Age
-            </label>
-            <input
-              type="number"
-              id="age"
-              name="age"
-              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Enter your age"
-              value={formData.age}
-              onChange={handleInputChange}
-              required
-            />
-          </div>
-
-          {/* Religion */}
-          <div className="mb-4">
-            <label htmlFor="religion" className="block text-sm font-medium text-gray-700">
-              Religion
-            </label>
-            <input
-              type="text"
-              id="religion"
-              name="religion"
-              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Enter your religion"
-              value={formData.religion}
-              onChange={handleInputChange}
-            />
-          </div>
-
-          {/* Preferred Age Range */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700">
-              Preferred Age Range
-            </label>
-            <div className="flex space-x-4">
-              <input
-                type="number"
-                name="from"
-                value={ageRange.from}
-                onChange={handleAgeRangeChange}
-                className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="From"
-              />
-              <input
-                type="number"
-                name="to"
-                value={ageRange.to}
-                onChange={handleAgeRangeChange}
-                className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="To"
-              />
-            </div>
-          </div>
-
-          {/* Error Message */}
-          {error && (
-            <div className="mb-4 p-2 bg-red-100 border border-red-400 text-red-700 rounded">
-              {error}
-            </div>
-          )}
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition"
-            disabled={loading}
-          >
-            {loading ? "Signing up..." : "Sign Up"}
-          </button>
-        </form>
+        {/* Sign In Link */}
+        <p className="text-center text-gray-600 mt-6 animate-fade-in">
+          Already have an account?{" "}
+          <Link to="/signin" className="text-primary-600 hover:text-primary-700 font-semibold">
+            Sign In
+          </Link>
+        </p>
       </div>
     </div>
   );
