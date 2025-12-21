@@ -34,6 +34,12 @@ class User(Base):
     nid_image_data = Column(LargeBinary, nullable=True)  # Binary data of uploaded NID image
     nid_image_filename = Column(String, nullable=True)  # Original filename
     nid_image_content_type = Column(String, nullable=True)  # MIME type (image/jpeg, etc.)
+    
+    # Recent verification image fields
+    recent_image_data = Column(LargeBinary, nullable=True)  # Binary data of recent verification image
+    recent_image_filename = Column(String, nullable=True)  # Original filename
+    recent_image_content_type = Column(String, nullable=True)  # MIME type (image/jpeg, etc.)
+    
     verification_date = Column(Date, nullable=True)  # Scheduled verification date
     verification_time = Column(Time, nullable=True)  # Scheduled verification time
     verification_status = Column(String, default="not_submitted")  # not_submitted, pending, verified, rejected
@@ -74,14 +80,21 @@ class User(Base):
         return self
 
     def update_verification_info(self, nid_image_data: bytes = None, nid_image_filename: str = None,
-                               nid_image_content_type: str = None, verification_date=None, 
-                               verification_time=None, verification_notes: str = None):
+                               nid_image_content_type: str = None, recent_image_data: bytes = None,
+                               recent_image_filename: str = None, recent_image_content_type: str = None,
+                               verification_date=None, verification_time=None, verification_notes: str = None):
         if nid_image_data:
             self.nid_image_data = nid_image_data
         if nid_image_filename:
             self.nid_image_filename = nid_image_filename
         if nid_image_content_type:
             self.nid_image_content_type = nid_image_content_type
+        if recent_image_data:
+            self.recent_image_data = recent_image_data
+        if recent_image_filename:
+            self.recent_image_filename = recent_image_filename
+        if recent_image_content_type:
+            self.recent_image_content_type = recent_image_content_type
         if verification_date:
             self.verification_date = verification_date
         if verification_time:

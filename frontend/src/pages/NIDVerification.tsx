@@ -2,9 +2,11 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import NIDImageDisplay from "../components/NIDImageDisplay";
+import RecentImageDisplay from "../components/RecentImageDisplay";
 
 const NIDVerification: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
+  const [recentImage, setRecentImage] = useState<File | null>(null);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [notes, setNotes] = useState("");
@@ -69,6 +71,12 @@ const NIDVerification: React.FC = () => {
     }
   };
 
+  const handleRecentImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setRecentImage(e.target.files[0]);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -90,6 +98,9 @@ const NIDVerification: React.FC = () => {
       // Create FormData object
       const formData = new FormData();
       formData.append("nid_image", file);
+      if (recentImage) {
+        formData.append("recent_image", recentImage);
+      }
       formData.append("verification_date", date);
       formData.append("verification_time", time);
       if (notes.trim()) {
@@ -175,6 +186,28 @@ const NIDVerification: React.FC = () => {
               className="w-full h-48 object-cover border rounded-lg"
               fallbackText="No NID image uploaded yet"
             />
+          </div>
+
+          {/* Recent Image to Verify */}
+          <div className="mb-4">
+            <label htmlFor="recentImage" className="block text-sm font-medium text-gray-700 mb-2">
+              Recent Image to Verify
+            </label>
+            <input
+              type="file"
+              id="recentImage"
+              accept="image/*"
+              onChange={handleRecentImageChange}
+              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+            />
+            {recentImage && <p className="text-sm text-gray-600 mt-2">Selected File: {recentImage.name}</p>}
+            <div className="mt-2">
+              <RecentImageDisplay 
+                className="w-full h-48 object-cover border rounded-lg"
+                fallbackText="No recent image uploaded yet"
+                previewImage={recentImage}
+              />
+            </div>
           </div>
 
           {/* Schedule Video Call */}

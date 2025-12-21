@@ -8,6 +8,8 @@ interface PendingUser {
   verification_time: string | null;
   has_nid_image: boolean;
   nid_image_filename: string | null;
+  has_recent_image: boolean;
+  recent_image_filename: string | null;
   verification_notes: string | null;
   created_at: string;
 }
@@ -142,6 +144,29 @@ const VerifyUsers: React.FC = () => {
     }
   };
 
+  const viewRecentImage = async (userId: string) => {
+    try {
+      const token = localStorage.getItem('adminAccessToken');
+      const response = await fetch(`http://localhost:8000/verification/recent-image/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch recent image');
+      }
+
+      const blob = await response.blob();
+      const imageUrl = URL.createObjectURL(blob);
+      
+      // Open image in new window
+      window.open(imageUrl, '_blank');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to view recent image');
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -210,6 +235,9 @@ const VerifyUsers: React.FC = () => {
                   NID Document
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Recent Image
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -249,6 +277,18 @@ const VerifyUsers: React.FC = () => {
                         className="text-blue-600 hover:text-blue-800 text-sm font-medium"
                       >
                         View NID Image
+                      </button>
+                    ) : (
+                      <span className="text-gray-400 text-sm">No image</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {user.has_recent_image ? (
+                      <button
+                        onClick={() => viewRecentImage(user.id)}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                      >
+                        View Recent Image
                       </button>
                     ) : (
                       <span className="text-gray-400 text-sm">No image</span>

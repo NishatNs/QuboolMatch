@@ -23,6 +23,8 @@ class VerificationStatusResponse(BaseModel):
     verification_notes: Optional[str] = None
     has_nid_image: bool = False
     nid_image_filename: Optional[str] = None
+    has_recent_image: bool = False
+    recent_image_filename: Optional[str] = None
 
 @router.post("/submit", response_model=VerificationResponse)
 async def submit_verification(
@@ -30,22 +32,39 @@ async def submit_verification(
     verification_time: str = Form(...),
     verification_notes: Optional[str] = Form(None),
     nid_image: UploadFile = File(...),
+    recent_image: Optional[UploadFile] = File(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Submit NID verification information including image, date, and time
+    Submit NID verification information including image, recent image, date, and time
     """
     try:
-        # Validate file type
+        # Validate NID image file type
         if not nid_image.content_type.startswith('image/'):
-            raise HTTPException(status_code=400, detail="Only image files are allowed")
+            raise HTTPException(status_code=400, detail="Only image files are allowed for NID image")
         
         # Validate file size (5MB limit)
         MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
-        image_data = await nid_image.read()
-        if len(image_data) > MAX_FILE_SIZE:
-            raise HTTPException(status_code=400, detail="File size exceeds 5MB limit")
+        nid_image_data = await nid_image.read()
+        if len(nid_image_data) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=400, detail="NID image file size exceeds 5MB limit")
+        
+        # Handle recent image if provided
+        recent_image_data = None
+        recent_image_filename = None
+        recent_image_content_type = None
+        
+        if recent_image:
+            if not recent_image.content_type.startswith('image/'):
+                raise HTTPException(status_code=400, detail="Only image files are allowed for recent image")
+            
+            recent_image_data = await recent_image.read()
+            if len(recent_image_data) > MAX_FILE_SIZE:
+                raise HTTPException(status_code=400, detail="Recent image file size exceeds 5MB limit")
+            
+            recent_image_filename = recent_image.filename
+            recent_image_content_type = recent_image.content_type
         
         # Parse date and time
         try:
@@ -56,9 +75,12 @@ async def submit_verification(
         
         # Update user verification info with binary data
         current_user.update_verification_info(
-            nid_image_data=image_data,
+            nid_image_data=nid_image_data,
             nid_image_filename=nid_image.filename,
             nid_image_content_type=nid_image.content_type,
+            recent_image_data=recent_image_data,
+            recent_image_filename=recent_image_filename,
+            recent_image_content_type=recent_image_content_type,
             verification_date=parsed_date,
             verification_time=parsed_time,
             verification_notes=verification_notes
@@ -94,7 +116,9 @@ async def get_verification_status(
         verified_at=current_user.verified_at.isoformat() if current_user.verified_at else None,
         verification_notes=current_user.verification_notes,
         has_nid_image=bool(current_user.nid_image_data),
-        nid_image_filename=current_user.nid_image_filename
+        nid_image_filename=current_user.nid_image_filename,
+        has_recent_image=bool(current_user.recent_image_data),
+        recent_image_filename=current_user.recent_image_filename
     )
 
 @router.get("/image")
@@ -153,6 +177,43 @@ async def get_verification_image_base64(
         "content_type": current_user.nid_image_content_type,
         "filename": current_user.nid_image_filename
     }
+
+@router.get("/recent-image")
+async def get_recent_verification_image(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get the recent verification image for the current user
+    """
+    if not current_user.recent_image_data:
+        raise HTTPException(status_code=404, detail="No recent image found")
+    
+    return Response(
+        content=current_user.recent_image_data,
+        media_type=current_user.recent_image_content_type or "image/jpeg"
+    )
+
+@router.get("/recent-image/{user_id}")
+async def get_user_recent_verification_image(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """
+    Admin endpoint to get recent verification image for any user
+    """
+    user = db.query(User).filter(User.id == user_id, User.is_deleted == False).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if not user.recent_image_data:
+        raise HTTPException(status_code=404, detail="No recent image found for this user")
+    
+    return Response(
+        content=user.recent_image_data,
+        media_type=user.recent_image_content_type or "image/jpeg"
+    )
 
 @router.post("/approve/{user_id}")
 async def approve_verification(
@@ -214,6 +275,8 @@ async def get_pending_verifications(
                 "verification_time": user.verification_time.isoformat() if user.verification_time else None,
                 "has_nid_image": bool(user.nid_image_data),
                 "nid_image_filename": user.nid_image_filename,
+                "has_recent_image": bool(user.recent_image_data),
+                "recent_image_filename": user.recent_image_filename,
                 "verification_notes": user.verification_notes,
                 "created_at": user.created_at.isoformat()
             }
