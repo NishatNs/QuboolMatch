@@ -191,7 +191,7 @@ const NIDVerification: React.FC = () => {
           {/* Recent Image to Verify */}
           <div className="mb-4">
             <label htmlFor="recentImage" className="block text-sm font-medium text-gray-700 mb-2">
-              Recent Image to Verify
+              Upload Your Recent Image to Verify
             </label>
             <input
               type="file"

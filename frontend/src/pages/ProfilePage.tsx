@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import IntroVideoDisplay from "../components/IntroVideoDisplay";
+import MedicalDocumentsDisplay from "../components/MedicalDocumentsDisplay";
 
 // Define interface for the lifestyle preferences
 interface LifestylePreferences {
@@ -68,6 +70,11 @@ interface ProfileData {
 }
 
 const ProfilePage: React.FC = () => {
+  const [introVideoFile, setIntroVideoFile] = useState<File | null>(null);
+  const [medicalDocumentFile, setMedicalDocumentFile] = useState<File | null>(null);
+  const [hasExistingVideo, setHasExistingVideo] = useState(false);
+  const [hasExistingDocument, setHasExistingDocument] = useState(false);
+  
   const [profile, setProfile] = useState<ProfileData>({
     // Personal Information
     name: "",
@@ -228,11 +235,28 @@ const ProfilePage: React.FC = () => {
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      setIntroVideoFile(file);
       const reader = new FileReader();
       
       reader.onload = () => {
         if (reader.result) {
           setProfile((prev) => ({ ...prev, introVideo: reader.result as string }));
+        }
+      };
+      
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleMedicalDocumentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setMedicalDocumentFile(file);
+      const reader = new FileReader();
+      
+      reader.onload = () => {
+        if (reader.result) {
+          setProfile((prev) => ({ ...prev, medicalDocuments: reader.result as string }));
         }
       };
       
@@ -264,7 +288,7 @@ const ProfilePage: React.FC = () => {
         long_term_condition: profile.longTermCondition,
         long_term_condition_description: profile.longTermConditionDescription,
         blood_group: profile.bloodGroup,
-        genetic_conditions: profile.geneticConditions,
+        genetic_conditions: JSON.stringify(profile.geneticConditions),
         fertility_awareness: profile.fertilityAwareness,
         disability: profile.disability,
         disability_description: profile.disabilityDescription,
@@ -294,7 +318,7 @@ const ProfilePage: React.FC = () => {
         lifestyle_pref_dietary_match: profile.lifestylePreferences.dietaryMatch,
         living_with_in_laws: profile.livingWithInLaws,
         career_support_expectations: profile.careerSupportExpectations,
-        necessary_preferences: profile.necessaryPreferences,
+        necessary_preferences: JSON.stringify(profile.necessaryPreferences),
         additional_comments: profile.additionalComments,
         is_completed: true
       };
@@ -323,7 +347,8 @@ const ProfilePage: React.FC = () => {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.detail || 'Failed to save profile');
+        console.error('Backend error response:', error);
+        throw new Error(error.detail || JSON.stringify(error) || 'Failed to save profile');
       }
 
       const result = await response.json();
@@ -331,7 +356,14 @@ const ProfilePage: React.FC = () => {
       alert("Profile information saved successfully!");
     } catch (error) {
       console.error('Error saving profile:', error);
-      alert(`Failed to save profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // Better error message extraction
+      let errorMessage = 'Unknown error';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null) {
+        errorMessage = JSON.stringify(error);
+      }
+      alert(`Failed to save profile: ${errorMessage}`);
     }
   };
 
@@ -354,6 +386,10 @@ const ProfilePage: React.FC = () => {
 
         if (response.ok) {
           const data = await response.json();
+          
+          // Check if video and documents exist
+          setHasExistingVideo(data.has_intro_video || false);
+          setHasExistingDocument(data.has_medical_documents || false);
           
           // Load profile picture if available
           let profilePictureData = '';
@@ -390,7 +426,7 @@ const ProfilePage: React.FC = () => {
             longTermCondition: data.long_term_condition || '',
             longTermConditionDescription: data.long_term_condition_description || '',
             bloodGroup: data.blood_group || '',
-            geneticConditions: data.genetic_conditions || [],
+            geneticConditions: data.genetic_conditions ? JSON.parse(data.genetic_conditions) : [],
             fertilityAwareness: data.fertility_awareness || '',
             disability: data.disability || '',
             disabilityDescription: data.disability_description || '',
@@ -422,7 +458,7 @@ const ProfilePage: React.FC = () => {
             },
             livingWithInLaws: data.living_with_in_laws || '',
             careerSupportExpectations: data.career_support_expectations || '',
-            necessaryPreferences: data.necessary_preferences || [],
+            necessaryPreferences: data.necessary_preferences ? JSON.parse(data.necessary_preferences) : [],
             additionalComments: data.additional_comments || ''
           });
         }
@@ -451,6 +487,11 @@ const ProfilePage: React.FC = () => {
             profile={profile} 
             onInputChange={handleInputChange}
             onVideoUpload={handleVideoUpload}
+            onMedicalDocumentUpload={handleMedicalDocumentUpload}
+            introVideoFile={introVideoFile}
+            medicalDocumentFile={medicalDocumentFile}
+            hasExistingVideo={hasExistingVideo}
+            hasExistingDocument={hasExistingDocument}
           />
           
           {/* Partner Preferences Section */}
@@ -558,7 +599,12 @@ const PersonalInfoSection: React.FC<{
   profile: ProfileData;
   onInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   onVideoUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-}> = ({ profile, onInputChange, onVideoUpload }) => {
+  onMedicalDocumentUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  introVideoFile: File | null;
+  medicalDocumentFile: File | null;
+  hasExistingVideo: boolean;
+  hasExistingDocument: boolean;
+}> = ({ profile, onInputChange, onVideoUpload, onMedicalDocumentUpload, introVideoFile, medicalDocumentFile, hasExistingVideo, hasExistingDocument }) => {
   return (
     <div className="mb-6">
       <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Personal Information</h2>
@@ -657,13 +703,27 @@ const PersonalInfoSection: React.FC<{
               onChange={onVideoUpload}
               className="hidden"
             />
-            <span className="ml-3 text-sm text-gray-500">
-              {profile.introVideo ? "Video uploaded ✓" : "No video uploaded yet"}
-            </span>
+            {!introVideoFile && !hasExistingVideo && (
+              <span className="ml-3 text-sm text-gray-500">
+                No video uploaded yet
+              </span>
+            )}
+            {(introVideoFile || hasExistingVideo) && (
+              <span className="ml-3 text-sm text-gray-500 text-green-600">
+                Video uploaded ✓
+              </span>
+            )}
           </div>
           <p className="mt-1 text-sm text-gray-500">
             Upload a short video introduction (max 60 seconds, MP4 format recommended)
           </p>
+          <div className="mt-3">
+            <IntroVideoDisplay 
+              className="w-full max-w-md h-64 object-cover border rounded-lg"
+              fallbackText="No intro video uploaded yet"
+              previewVideo={introVideoFile}
+            />
+          </div>
         </div>
 
         {/* Health & Genetics */}
@@ -971,31 +1031,31 @@ const PersonalInfoSection: React.FC<{
                   type="file"
                   id="medicalDocs"
                   name="medicalDocuments"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      const file = e.target.files[0];
-                      const reader = new FileReader();
-                      
-                      reader.onload = () => {
-                        if (reader.result) {
-                          // Store base64 data
-                          setProfile((prev) => ({ ...prev, medicalDocuments: reader.result as string }));
-                        }
-                      };
-                      
-                      reader.readAsDataURL(file);
-                    }
-                  }}
+                  onChange={onMedicalDocumentUpload}
                   className="hidden"
                   accept=".pdf,.jpg,.jpeg,.png"
                 />
-                <span className="ml-3 text-sm text-gray-500">
-                  {profile.medicalDocuments ? "Document uploaded ✓" : "No document uploaded"}
-                </span>
+                {!medicalDocumentFile && !hasExistingDocument && (
+                  <span className="ml-3 text-sm text-gray-500">
+                    No document uploaded
+                  </span>
+                )}
+                {(medicalDocumentFile || hasExistingDocument) && (
+                  <span className="ml-3 text-sm text-gray-500 text-green-600">
+                    Document uploaded ✓
+                  </span>
+                )}
               </div>
               <p className="mt-1 text-xs text-gray-500">
                 You can upload vaccination records or other medical documents that you feel are relevant. All documents are kept confidential.
               </p>
+              <div className="mt-3">
+                <MedicalDocumentsDisplay 
+                  className="w-full max-w-md h-48 object-cover border rounded-lg"
+                  fallbackText="No medical documents uploaded yet"
+                  previewDocument={medicalDocumentFile}
+                />
+              </div>
             </div>
           </div>
           
@@ -1009,6 +1069,7 @@ const PersonalInfoSection: React.FC<{
                   type="radio"
                   name="dietaryPreference"
                   value="Vegetarian"
+                  checked={profile.dietaryPreference === "Vegetarian"}
                   onChange={onInputChange}
                   className="mr-2"
                 />
@@ -1019,6 +1080,7 @@ const PersonalInfoSection: React.FC<{
                   type="radio"
                   name="dietaryPreference"
                   value="Non-Vegetarian"
+                  checked={profile.dietaryPreference === "Non-Vegetarian"}
                   onChange={onInputChange}
                   className="mr-2"
                 />
@@ -1029,6 +1091,7 @@ const PersonalInfoSection: React.FC<{
                   type="radio"
                   name="dietaryPreference"
                   value="Vegan"
+                  checked={profile.dietaryPreference === "Vegan"}
                   onChange={onInputChange}
                   className="mr-2"
                 />
@@ -1046,6 +1109,7 @@ const PersonalInfoSection: React.FC<{
                   type="radio"
                   name="smokingHabit"
                   value="Yes"
+                  checked={profile.smokingHabit === "Yes"}
                   onChange={onInputChange}
                   className="mr-2"
                 />
@@ -1056,6 +1120,7 @@ const PersonalInfoSection: React.FC<{
                   type="radio"
                   name="smokingHabit"
                   value="No"
+                  checked={profile.smokingHabit === "No"}
                   onChange={onInputChange}
                   className="mr-2"
                 />
@@ -1073,6 +1138,7 @@ const PersonalInfoSection: React.FC<{
                   type="radio"
                   name="alcoholConsumption"
                   value="Yes"
+                  checked={profile.alcoholConsumption === "Yes"}
                   onChange={onInputChange}
                   className="mr-2"
                 />
@@ -1083,6 +1149,7 @@ const PersonalInfoSection: React.FC<{
                   type="radio"
                   name="alcoholConsumption"
                   value="No"
+                  checked={profile.alcoholConsumption === "No"}
                   onChange={onInputChange}
                   className="mr-2"
                 />
