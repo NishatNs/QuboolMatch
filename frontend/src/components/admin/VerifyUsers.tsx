@@ -12,6 +12,7 @@ interface PendingUser {
   recent_image_filename: string | null;
   verification_notes: string | null;
   created_at: string;
+  matching_percentage: number | null;
 }
 
 interface PendingVerificationsResponse {
@@ -23,6 +24,7 @@ const VerifyUsers: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [processingUserId, setProcessingUserId] = useState<string | null>(null);
+  const [matchingUserId, setMatchingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPendingUsers();
@@ -167,6 +169,45 @@ const VerifyUsers: React.FC = () => {
     }
   };
 
+  const handleMatchImages = async (userId: string) => {
+    setMatchingUserId(userId);
+    try {
+      const token = localStorage.getItem('adminAccessToken');
+      const response = await fetch(`http://localhost:8000/verification/match-images/${userId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to match images');
+      }
+
+      const data = await response.json();
+
+      if (!data.success) {
+        alert(`Error: ${data.error}`);
+        return;
+      }
+
+      // Update the user's matching percentage in the state
+      setPendingUsers(prev => prev.map(user => 
+        user.id === userId 
+          ? { ...user, matching_percentage: data.matchingPercentage }
+          : user
+      ));
+
+      // Show success message
+      alert(`Match successful! Matching percentage: ${data.matchingPercentage.toFixed(1)}%`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to match images');
+    } finally {
+      setMatchingUserId(null);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -298,12 +339,26 @@ const VerifyUsers: React.FC = () => {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      onClick={() => alert('Match functionality coming soon!')}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md text-sm"
-                    >
-                      Match
-                    </button>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handleMatchImages(user.id)}
+                        disabled={matchingUserId === user.id}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {matchingUserId === user.id ? 'Matching...' : 'Match'}
+                      </button>
+                      {user.matching_percentage !== null && user.matching_percentage !== undefined && (
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          user.matching_percentage >= 80 
+                            ? 'bg-green-100 text-green-800'
+                            : user.matching_percentage >= 50
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {user.matching_percentage.toFixed(1)}%
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                     <button

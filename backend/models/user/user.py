@@ -1,7 +1,7 @@
 import uuid
 import bcrypt
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Boolean, DateTime, Date, Time, Text, LargeBinary, Integer
+from sqlalchemy import Column, String, Boolean, DateTime, Date, Time, Text, LargeBinary, Integer, Float
 from database import Base
 
 
@@ -45,6 +45,7 @@ class User(Base):
     verification_status = Column(String, default="not_submitted")  # not_submitted, pending, verified, rejected
     verification_notes = Column(Text, nullable=True)  # Additional notes for verification
     verified_at = Column(DateTime, nullable=True)  # When verification was completed
+    matching_percentage = Column(Float, nullable=True)  # AI-based face matching percentage (0-100)
 
     def __init__(self, name: str, email: str, password: str, gender: str, nid: str, age: int, 
                  religion: str = None, preferred_age_from: int = None, preferred_age_to: int = None, 

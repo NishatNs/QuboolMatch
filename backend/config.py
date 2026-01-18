@@ -6,12 +6,13 @@ class Settings:
     DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@db/")
     DATABASE_NAME = os.getenv("DATABASE_NAME", "example_prod")
     SECRET_KEY = os.getenv("SECRET_KEY", "secret_key")
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 class DevSettings(Settings):
     """Development settings class"""
     DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:mim123@localhost:5432/")
     DATABASE_NAME = os.getenv("DATABASE_NAME", "qubool")
-
+    GEMINI_API_KEY = "AIzaSyB30LDWlo3jG4BD54dPPP620VSY9KEFKN4"
 class TestSettings(Settings):
     """Test settings class"""
     DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@db/")

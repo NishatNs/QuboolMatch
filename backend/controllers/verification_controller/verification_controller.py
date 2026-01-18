@@ -7,6 +7,11 @@ from shared.token import get_current_user, get_current_admin_user
 from pydantic import BaseModel
 from typing import Optional
 import base64
+import os
+import json
+from google import genai
+from google.genai import types
+from config import get_settings
 
 router = APIRouter()
 
@@ -278,8 +283,137 @@ async def get_pending_verifications(
                 "has_recent_image": bool(user.recent_image_data),
                 "recent_image_filename": user.recent_image_filename,
                 "verification_notes": user.verification_notes,
-                "created_at": user.created_at.isoformat()
+                "created_at": user.created_at.isoformat(),
+                "matching_percentage": user.matching_percentage
             }
             for user in pending_users
         ]
     }
+
+@router.post("/match-images/{user_id}")
+async def match_verification_images(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """
+    Admin endpoint to match NID image with recent verification image using Gemini AI.
+    Returns a matching percentage indicating how similar the two faces are.
+    """
+    # Retrieve user from database
+    user = db.query(User).filter(User.id == user_id, User.is_deleted == False).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Validate that both images exist
+    if not user.nid_image_data:
+        return {
+            "success": False,
+            "error": "NID image not found. User must upload NID image first."
+        }
+    
+    if not user.recent_image_data:
+        return {
+            "success": False,
+            "error": "Recent verification image not found. User must upload recent image first."
+        }
+    
+    try:
+        # Get Gemini API key from settings
+        settings = get_settings()
+        api_key = settings.GEMINI_API_KEY
+        
+        if not api_key:
+            return {
+                "success": False,
+                "error": "Gemini API key not configured. Please set GEMINI_API_KEY environment variable."
+            }
+        
+        # Convert binary images to base64
+        nid_image_base64 = base64.b64encode(user.nid_image_data).decode('utf-8')
+        recent_image_base64 = base64.b64encode(user.recent_image_data).decode('utf-8')
+        
+        # Initialize Gemini client
+        client = genai.Client(api_key=api_key)
+        
+        # Prepare content with both images
+        model = "gemini-2.5-flash-lite"
+        contents = [
+            types.Content(
+                role="user",
+                parts=[
+                    types.Part.from_text(
+                        text="Compare these two photos and determine if they show the same person. "
+                             "Analyze facial features including face shape, eyes, nose, mouth, and overall appearance. "
+                             "Return a matching percentage from 0-100 where 100 means definitely the same person "
+                             "and 0 means definitely different people. Be strict in your assessment."
+                    ),
+                    types.Part.from_bytes(
+                        data=user.nid_image_data,
+                        mime_type=user.nid_image_content_type or "image/jpeg"
+                    ),
+                    types.Part.from_bytes(
+                        data=user.recent_image_data,
+                        mime_type=user.recent_image_content_type or "image/jpeg"
+                    ),
+                ],
+            ),
+        ]
+        
+        # Configure response with structured output
+        generate_content_config = types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=types.Schema(
+                type=types.Type.OBJECT,
+                required=["matchingPercentage"],
+                properties={
+                    "matchingPercentage": types.Schema(
+                        type=types.Type.NUMBER,
+                    ),
+                },
+            ),
+        )
+        
+        # Call Gemini API and collect full response
+        full_response = ""
+        for chunk in client.models.generate_content_stream(
+            model=model,
+            contents=contents,
+            config=generate_content_config,
+        ):
+            if chunk.text:
+                full_response += chunk.text
+        
+        # Parse JSON response
+        result = json.loads(full_response)
+        matching_percentage = float(result.get("matchingPercentage", 0))
+        
+        # Ensure percentage is within valid range
+        matching_percentage = max(0.0, min(100.0, matching_percentage))
+        
+        # Save matching percentage to database
+        user.matching_percentage = matching_percentage
+        db.commit()
+        
+        return {
+            "success": True,
+            "matchingPercentage": matching_percentage
+        }
+        
+    except json.JSONDecodeError as e:
+        # Set matching percentage to null on error
+        user.matching_percentage = None
+        db.commit()
+        return {
+            "success": False,
+            "error": f"Failed to parse AI response: {str(e)}"
+        }
+    except Exception as e:
+        # Set matching percentage to null on error
+        user.matching_percentage = None
+        db.commit()
+        return {
+            "success": False,
+            "error": f"Failed to match images: {str(e)}"
+        }
