@@ -114,6 +114,17 @@ class Profile(Base):
 
     def to_dict(self):
         """Convert profile to dictionary"""
+        # Convert profile picture to base64 if exists
+        profile_picture_base64 = None
+        if self.profile_picture_data:
+            try:
+                import base64
+                encoded = base64.b64encode(self.profile_picture_data).decode('utf-8')
+                content_type = self.profile_picture_content_type or "image/jpeg"
+                profile_picture_base64 = f"data:{content_type};base64,{encoded}"
+            except Exception as e:
+                print(f"Error encoding profile picture: {e}")
+        
         return {
             'id': self.id,
             'user_id': self.user_id,
@@ -143,6 +154,7 @@ class Profile(Base):
             'chronic_illness': self.chronic_illness,
             'interests': self.interests,
             'has_profile_picture': bool(self.profile_picture_data),
+            'profile_picture': profile_picture_base64,
             'profile_picture_filename': self.profile_picture_filename,
             'preferred_age_min': self.preferred_age_min,
             'preferred_age_max': self.preferred_age_max,

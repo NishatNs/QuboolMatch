@@ -1,272 +1,290 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { notificationApi } from "../services/api";
 
-// Define notification types
+// Define notification types from backend
 interface Notification {
   id: string;
-  type: "interest_received" | "interest_accepted" | "profile_view" | "match" | "system";
-  fromUserId?: string;
-  fromUserName?: string;
-  fromUserImage?: string;
+  type: "interest_received" | "interest_accepted" | "interest_rejected" | "system";
+  from_user_id?: string;
+  from_user?: {
+    id: string;
+    name: string;
+    age: number;
+    profile_picture: string | null;
+  };
   message: string;
-  timestamp: string; // ISO date string
-  isRead: boolean;
+  created_at: string;
+  is_read: boolean;
+  related_id?: string;
 }
 
 const Notifications: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // In a real app, this would be an API call
-    setTimeout(() => {
-      const dummyNotifications: Notification[] = [
-        {
-          id: "1",
-          type: "interest_received",
-          fromUserId: "7",
-          fromUserName: "Sharmin Akter",
-          fromUserImage: "https://randomuser.me/api/portraits/women/33.jpg",
-          message: "Sharmin has shown interest in your profile",
-          timestamp: new Date(Date.now() - 30 * 60000).toISOString(), // 30 minutes ago
-          isRead: false
-        },
-        {
-          id: "2",
-          type: "match",
-          fromUserId: "5",
-          fromUserName: "Tasneem Begum",
-          fromUserImage: "https://randomuser.me/api/portraits/women/90.jpg",
-          message: "You and Tasneem are now matched! You can start a conversation.",
-          timestamp: new Date(Date.now() - 2 * 3600000).toISOString(), // 2 hours ago
-          isRead: true
-        },
-        {
-          id: "3",
-          type: "profile_view",
-          fromUserId: "2",
-          fromUserName: "Farhan Ahmed",
-          fromUserImage: "https://randomuser.me/api/portraits/men/32.jpg",
-          message: "Farhan viewed your profile",
-          timestamp: new Date(Date.now() - 5 * 3600000).toISOString(), // 5 hours ago
-          isRead: true
-        },
-        {
-          id: "4",
-          type: "interest_accepted",
-          fromUserId: "1",
-          fromUserName: "Ayesha Rahman",
-          fromUserImage: "https://randomuser.me/api/portraits/women/44.jpg",
-          message: "Ayesha accepted your interest request",
-          timestamp: new Date(Date.now() - 1 * 86400000).toISOString(), // 1 day ago
-          isRead: false
-        },
-        {
-          id: "5",
-          type: "system",
-          message: "Your profile verification is complete. You can now access all features.",
-          timestamp: new Date(Date.now() - 2 * 86400000).toISOString(), // 2 days ago
-          isRead: true
-        }
-      ];
-
-      setNotifications(dummyNotifications);
-      setLoading(false);
-    }, 1000);
+    loadNotifications();
   }, []);
 
-  const markAsRead = (id: string) => {
-    setNotifications(prevNotifications => 
-      prevNotifications.map(notification => 
-        notification.id === id ? { ...notification, isRead: true } : notification
-      )
-    );
+  const loadNotifications = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await notificationApi.getNotifications();
+      setNotifications(response.notifications);
+      setUnreadCount(response.unread_count);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load notifications');
+      console.error('Error loading notifications:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications(prevNotifications => 
-      prevNotifications.map(notification => ({ ...notification, isRead: true }))
-    );
+  const markAsRead = async (id: string) => {
+    try {
+      await notificationApi.markAsRead(id);
+      setNotifications(prevNotifications => 
+        prevNotifications.map(notification => 
+          notification.id === id ? { ...notification, is_read: true } : notification
+        )
+      );
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (err: any) {
+      console.error('Error marking notification as read:', err);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      await notificationApi.markAllAsRead();
+      setNotifications(prevNotifications => 
+        prevNotifications.map(notification => ({ ...notification, is_read: true }))
+      );
+      setUnreadCount(0);
+    } catch (err: any) {
+      console.error('Error marking all as read:', err);
+    }
+  };
+
+  const deleteNotification = async (id: string) => {
+    if (!window.confirm('Delete this notification?')) return;
+    
+    try {
+      await notificationApi.deleteNotification(id);
+      setNotifications(prevNotifications => 
+        prevNotifications.filter(notification => notification.id !== id)
+      );
+      // Recalculate unread count
+      const deletedNotif = notifications.find(n => n.id === id);
+      if (deletedNotif && !deletedNotif.is_read) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (err: any) {
+      alert('Error deleting notification: ' + err.message);
+    }
   };
 
   const handleNotificationClick = (notification: Notification) => {
     markAsRead(notification.id);
     
-    if (notification.fromUserId) {
-      // Navigate to the user profile or chat
-      if (notification.type === "interest_received") {
-        navigate(`/profile/${notification.fromUserId}`);
-      } else if (notification.type === "match" || notification.type === "interest_accepted") {
-        navigate(`/messages/${notification.fromUserId}`);
-      } else if (notification.type === "profile_view") {
-        navigate(`/profile/${notification.fromUserId}`);
-      }
+    // Navigate based on notification type
+    if (notification.type === "interest_received") {
+      navigate(`/find-matches`);
+    } else if (notification.type === "interest_accepted") {
+      navigate(`/find-matches`);
+    }
+  };
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case "interest_received":
+        return "💌";
+      case "interest_accepted":
+        return "✅";
+      case "interest_rejected":
+        return "❌";
+      case "system":
+        return "🔔";
+      default:
+        return "📬";
+    }
+  };
+
+  const getNotificationColor = (type: string) => {
+    switch (type) {
+      case "interest_received":
+        return "bg-pink-50 border-pink-200";
+      case "interest_accepted":
+        return "bg-green-50 border-green-200";
+      case "interest_rejected":
+        return "bg-red-50 border-red-200";
+      case "system":
+        return "bg-blue-50 border-blue-200";
+      default:
+        return "bg-gray-50 border-gray-200";
     }
   };
 
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-    
-    if (diffInSeconds < 60) {
-      return 'Just now';
-    } else if (diffInSeconds < 3600) {
-      const minutes = Math.floor(diffInSeconds / 60);
-      return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
-    } else if (diffInSeconds < 86400) {
-      const hours = Math.floor(diffInSeconds / 3600);
-      return `${hours} hour${hours > 1 ? 's' : ''} ago`;
-    } else if (diffInSeconds < 604800) {
-      const days = Math.floor(diffInSeconds / 86400);
-      return `${days} day${days > 1 ? 's' : ''} ago`;
-    } else {
-      return date.toLocaleDateString();
-    }
-  };
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
 
-  const getNotificationIcon = (type: string) => {
-    switch(type) {
-      case "interest_received":
-        return (
-          <div className="flex-shrink-0 rounded-full bg-pink-100 p-2">
-            <svg className="h-5 w-5 text-pink-600" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
-            </svg>
-          </div>
-        );
-      case "interest_accepted":
-        return (
-          <div className="flex-shrink-0 rounded-full bg-green-100 p-2">
-            <svg className="h-5 w-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
-          </div>
-        );
-      case "match":
-        return (
-          <div className="flex-shrink-0 rounded-full bg-purple-100 p-2">
-            <svg className="h-5 w-5 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16zm3.707 8.707l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 011.414-1.414L9 10.586V7a1 1 0 012 0v3.586l1.293-1.293a1 1 0 011.414 1.414z" clipRule="evenodd" />
-            </svg>
-          </div>
-        );
-      case "profile_view":
-        return (
-          <div className="flex-shrink-0 rounded-full bg-blue-100 p-2">
-            <svg className="h-5 w-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-              <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-            </svg>
-          </div>
-        );
-      default:
-        return (
-          <div className="flex-shrink-0 rounded-full bg-gray-100 p-2">
-            <svg className="h-5 w-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-            </svg>
-          </div>
-        );
-    }
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    return date.toLocaleDateString();
   };
 
   return (
     <div className="min-h-screen bg-gray-100 py-8">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="container mx-auto px-4 max-w-4xl">
         <div className="bg-white rounded-xl shadow-lg p-6">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
-            <button 
-              onClick={markAllAsRead} 
-              className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
-            >
-              Mark all as read
-            </button>
+            <h1 className="text-3xl font-bold text-gray-800">Notifications</h1>
+            {unreadCount > 0 && (
+              <button
+                onClick={markAllAsRead}
+                className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+              >
+                Mark all as read
+              </button>
+            )}
           </div>
 
+          {/* Unread count badge */}
+          {unreadCount > 0 && (
+            <div className="bg-indigo-100 border-l-4 border-indigo-500 p-3 mb-6">
+              <p className="text-sm text-indigo-700">
+                You have <span className="font-bold">{unreadCount}</span> unread notification{unreadCount > 1 ? 's' : ''}
+              </p>
+            </div>
+          )}
+
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Notifications List */}
           {loading ? (
             <div className="flex justify-center items-center py-20">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
             </div>
-          ) : notifications.length > 0 ? (
-            <div className="space-y-4">
-              {notifications.map((notification) => (
-                <div 
-                  key={notification.id} 
-                  onClick={() => handleNotificationClick(notification)}
-                  className={`flex p-4 rounded-lg border cursor-pointer transition-colors hover:bg-gray-50 ${
-                    notification.isRead ? 'bg-white border-gray-200' : 'bg-blue-50 border-blue-100'
-                  }`}
-                >
-                  {notification.fromUserImage ? (
-                    <div className="flex-shrink-0 mr-4">
-                      <img 
-                        src={notification.fromUserImage} 
-                        alt={notification.fromUserName || "User"} 
-                        className="h-12 w-12 rounded-full object-cover border-2 border-gray-200"
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex-shrink-0 mr-4">
-                      {getNotificationIcon(notification.type)}
-                    </div>
-                  )}
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between">
-                      <p className={`text-sm font-medium ${notification.isRead ? 'text-gray-900' : 'text-indigo-700'}`}>
-                        {notification.message}
-                      </p>
-                      <span className="text-xs text-gray-500 whitespace-nowrap ml-2">
-                        {formatTimestamp(notification.timestamp)}
-                      </span>
-                    </div>
-                    
-                    {(notification.type === "interest_received" || notification.type === "match") && (
-                      <div className="mt-2 flex space-x-2">
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // In a real app, handle accepting interest
-                            alert("Interest accepted!");
-                          }}
-                          className="px-3 py-1 bg-indigo-600 text-white text-xs font-medium rounded-md hover:bg-indigo-700"
-                        >
-                          Accept
-                        </button>
-                        {notification.type === "interest_received" && (
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // In a real app, handle declining interest
-                              alert("Interest declined");
-                            }}
-                            className="px-3 py-1 bg-gray-200 text-gray-800 text-xs font-medium rounded-md hover:bg-gray-300"
-                          >
-                            Decline
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  
-                  {!notification.isRead && (
-                    <div className="flex-shrink-0 ml-2">
-                      <span className="inline-block h-2 w-2 rounded-full bg-indigo-600"></span>
-                    </div>
-                  )}
-                </div>
-              ))}
+          ) : notifications.length === 0 ? (
+            <div className="text-center py-16">
+              <svg
+                className="mx-auto h-16 w-16 text-gray-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                />
+              </svg>
+              <h3 className="mt-4 text-lg font-medium text-gray-900">No notifications</h3>
+              <p className="mt-2 text-sm text-gray-500">
+                You're all caught up! Check back later for updates.
+              </p>
             </div>
           ) : (
-            <div className="text-center py-16">
-              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No notifications</h3>
-              <p className="mt-1 text-sm text-gray-500">You're all caught up! Check back later for new notifications.</p>
+            <div className="space-y-3">
+              {notifications.map((notification) => (
+                <div
+                  key={notification.id}
+                  className={`
+                    border rounded-lg p-4 transition-all duration-200 cursor-pointer
+                    ${getNotificationColor(notification.type)}
+                    ${!notification.is_read ? 'border-l-4' : ''}
+                    hover:shadow-md
+                  `}
+                  onClick={() => handleNotificationClick(notification)}
+                >
+                  <div className="flex items-start">
+                    {/* Notification Icon/Avatar */}
+                    <div className="flex-shrink-0 mr-4">
+                      {notification.from_user?.profile_picture ? (
+                        <img
+                          src={notification.from_user.profile_picture}
+                          alt={notification.from_user.name}
+                          className="h-12 w-12 rounded-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(notification.from_user?.name || 'User')}&size=48&background=random`;
+                          }}
+                        />
+                      ) : (
+                        <div className="h-12 w-12 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xl font-bold">
+                          {getNotificationIcon(notification.type)}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Notification Content */}
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm ${!notification.is_read ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>
+                        {notification.message}
+                      </p>
+                      {notification.from_user && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          From: {notification.from_user.name}, {notification.from_user.age}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-400 mt-1">
+                        {formatTimestamp(notification.created_at)}
+                      </p>
+                    </div>
+
+                    {/* Unread Indicator */}
+                    {!notification.is_read && (
+                      <div className="flex-shrink-0 ml-2">
+                        <div className="h-3 w-3 bg-indigo-600 rounded-full"></div>
+                      </div>
+                    )}
+
+                    {/* Delete Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteNotification(notification.id);
+                      }}
+                      className="flex-shrink-0 ml-4 text-gray-400 hover:text-red-600 transition-colors"
+                      title="Delete notification"
+                    >
+                      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path
+                          fillRule="evenodd"
+                          d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

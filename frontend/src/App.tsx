@@ -14,6 +14,7 @@ import NIDVerification from "./pages/NIDVerification";
 import ProfilePage from "./pages/ProfilePage";
 import FindMatches from "./pages/FindMatches";
 import Notifications from "./pages/Notifications";
+import InterestRequests from "./pages/InterestRequests";
 import { AuthProvider } from "./context/AuthContext";
 import { AdminProvider } from "./context/AdminContext";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -61,10 +62,16 @@ function App(): JSX.Element {
                 <Layout><FindMatches /></Layout>
               </ProtectedRoute>
             } />
+            <Route path="/interest-requests" element={
+              <ProtectedRoute>
+                <Layout><InterestRequests /></Layout>
+              </ProtectedRoute>
+            } />
             
             {/* Direct access routes for development */}
             <Route path="/matches" element={<Layout><FindMatches /></Layout>} />
             <Route path="/notifications" element={<Layout><Notifications /></Layout>} />
+            <Route path="/interests" element={<Layout><InterestRequests /></Layout>} />
             <Route path="/verify" element={<Layout><NIDVerification /></Layout>} />
           </Routes>
         </Router>

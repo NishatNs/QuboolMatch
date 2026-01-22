@@ -1,209 +1,135 @@
 import React, { useState, useEffect } from "react";
+import { interestApi } from "../services/api";
 
-// Define the structure for a potential match
-interface MatchProfile {
+// Define the structure for a user from the API
+interface User {
   id: string;
   name: string;
-  age: string;
-  location: string;
-  profession: string;
-  profilePicture: string;
-  religion: string;
-  interests: string[];
-  verificationStatus: 'verified' | 'pending' | 'unverified';
-  matchPercentage: number;
-  matchCriteria: {
-    location: boolean;
-    religion: boolean;
-    age: boolean;
-    interests: boolean;
-  };
+  age: number;
+  gender: string;
+  religion: string | null;
+  location: string | null;
+  profession: string | null;
+  academic_background: string | null;
+  profile_picture: string | null;
+  interest_status: 'none' | 'pending_sent' | 'pending_received' | 'accepted' | 'rejected';
 }
 
 const FindMatches: React.FC = () => {
-  // State variables
-  const [matches, setMatches] = useState<MatchProfile[]>([]);
-  const [filteredMatches, setFilteredMatches] = useState<MatchProfile[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sendingInterest, setSendingInterest] = useState<string | null>(null);
+  const [cancelingInterest, setCancelingInterest] = useState<string | null>(null);
+  
   const [filters, setFilters] = useState({
-    verificationStatus: 'all',
-    minMatchPercentage: 0,
     location: '',
-    ageRange: [18, 60],
-    religion: 'all'
+    religion: 'all',
+    gender: 'all',
+    minAge: 18,
+    maxAge: 60
   });
 
-  // Load dummy profiles on component mount
+  // Load users on component mount
   useEffect(() => {
-    // This would be an API call in a real application
-    const dummyProfiles: MatchProfile[] = [
-      {
-        id: "1",
-        name: "Ayesha Rahman",
-        age: "27",
-        location: "Dhaka, Bangladesh",
-        profession: "Software Engineer",
-        profilePicture: "https://randomuser.me/api/portraits/women/44.jpg",
-        religion: "Islam",
-        interests: ["Technology", "Reading", "Traveling", "Photography"],
-        verificationStatus: 'verified',
-        matchPercentage: 92,
-        matchCriteria: { location: true, religion: true, age: true, interests: true }
-      },
-      {
-        id: "2",
-        name: "Farhan Ahmed",
-        age: "32",
-        location: "Dhaka, Bangladesh",
-        profession: "Doctor",
-        profilePicture: "https://randomuser.me/api/portraits/men/32.jpg",
-        religion: "Islam",
-        interests: ["Sports", "Cooking", "Medicine", "Fitness"],
-        verificationStatus: 'verified',
-        matchPercentage: 85,
-        matchCriteria: { location: true, religion: true, age: true, interests: false }
-      },
-      {
-        id: "3",
-        name: "Nadia Khan",
-        age: "26",
-        location: "Chittagong, Bangladesh",
-        profession: "Architect",
-        profilePicture: "https://randomuser.me/api/portraits/women/68.jpg",
-        religion: "Islam",
-        interests: ["Art", "Design", "Hiking", "Music"],
-        verificationStatus: 'pending',
-        matchPercentage: 78,
-        matchCriteria: { location: false, religion: true, age: true, interests: true }
-      },
-      {
-        id: "4",
-        name: "Rahim Uddin",
-        age: "30",
-        location: "Sylhet, Bangladesh",
-        profession: "Business Analyst",
-        profilePicture: "https://randomuser.me/api/portraits/men/76.jpg",
-        religion: "Islam",
-        interests: ["Finance", "Sports", "Travel", "Politics"],
-        verificationStatus: 'unverified',
-        matchPercentage: 65,
-        matchCriteria: { location: false, religion: true, age: false, interests: false }
-      },
-      {
-        id: "5",
-        name: "Tasneem Begum",
-        age: "27",
-        location: "Dhaka, Bangladesh",
-        profession: "Teacher",
-        profilePicture: "https://randomuser.me/api/portraits/women/90.jpg",
-        religion: "Islam",
-        interests: ["Education", "Books", "Volunteering", "Cooking"],
-        verificationStatus: 'verified',
-        matchPercentage: 88,
-        matchCriteria: { location: true, religion: true, age: true, interests: false }
-      },
-      {
-        id: "6",
-        name: "Kamal Hossain",
-        age: "29",
-        location: "Khulna, Bangladesh",
-        profession: "Civil Engineer",
-        profilePicture: "https://randomuser.me/api/portraits/men/40.jpg",
-        religion: "Islam",
-        interests: ["Engineering", "Technology", "Outdoor activities", "Music"],
-        verificationStatus: 'pending',
-        matchPercentage: 72,
-        matchCriteria: { location: false, religion: true, age: true, interests: false }
-      },
-      {
-        id: "7",
-        name: "Sharmin Akter",
-        age: "25",
-        location: "Dhaka, Bangladesh",
-        profession: "Data Scientist",
-        profilePicture: "https://randomuser.me/api/portraits/women/33.jpg",
-        religion: "Islam",
-        interests: ["AI", "Technology", "Books", "Chess"],
-        verificationStatus: 'verified',
-        matchPercentage: 94,
-        matchCriteria: { location: true, religion: true, age: true, interests: true }
-      },
-      {
-        id: "8",
-        name: "Imran Khan",
-        age: "34",
-        location: "Rajshahi, Bangladesh",
-        profession: "University Professor",
-        profilePicture: "https://randomuser.me/api/portraits/men/55.jpg",
-        religion: "Islam",
-        interests: ["Academia", "Literature", "Philosophy", "Music"],
-        verificationStatus: 'unverified',
-        matchPercentage: 60,
-        matchCriteria: { location: false, religion: true, age: false, interests: true }
-      }
-    ];
-
-    // Simulate API loading delay
-    setTimeout(() => {
-      setMatches(dummyProfiles);
-      setFilteredMatches(dummyProfiles);
-      setLoading(false);
-    }, 1000);
+    loadUsers();
   }, []);
+
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await interestApi.browseUsers();
+      setUsers(response.users);
+      setFilteredUsers(response.users);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load users');
+      console.error('Error loading users:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Apply filters when filter state changes
   useEffect(() => {
-    const filtered = matches.filter(match => {
-      // Filter by verification status
-      if (filters.verificationStatus !== 'all' && match.verificationStatus !== filters.verificationStatus) {
+    const filtered = users.filter(user => {
+      if (filters.location && !user.location?.toLowerCase().includes(filters.location.toLowerCase())) {
         return false;
       }
-      
-      // Filter by match percentage
-      if (match.matchPercentage < filters.minMatchPercentage) {
+      if (filters.religion !== 'all' && user.religion !== filters.religion) {
         return false;
       }
-      
-      // Filter by location
-      if (filters.location && !match.location.toLowerCase().includes(filters.location.toLowerCase())) {
+      if (filters.gender !== 'all' && user.gender !== filters.gender) {
         return false;
       }
-      
-      // Filter by religion
-      if (filters.religion !== 'all' && match.religion !== filters.religion) {
+      if (user.age < filters.minAge || user.age > filters.maxAge) {
         return false;
       }
-      
-      // Filter by age range (convert string age to number for comparison)
-      const ageNum = parseInt(match.age);
-      if (ageNum < filters.ageRange[0] || ageNum > filters.ageRange[1]) {
-        return false;
-      }
-      
       return true;
     });
-    
-    setFilteredMatches(filtered);
-  }, [filters, matches]);
+    setFilteredUsers(filtered);
+  }, [filters, users]);
 
-  // Handle filter changes
   const handleFilterChange = (name: string, value: any) => {
-    setFilters(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFilters(prev => ({ ...prev, [name]: value }));
   };
 
-  // Handle sending interest to a profile
-  const handleSendInterest = (id: string) => {
-    // In a real app, this would send an API request
-    alert(`Interest sent to profile #${id}!`);
+  const handleSendInterest = async (userId: string, userName: string) => {
+    if (!window.confirm(`Send interest to ${userName}?`)) return;
+    try {
+      setSendingInterest(userId);
+      await interestApi.sendInterest(userId, `Hi ${userName}, I'd like to connect with you!`);
+      await loadUsers();
+      alert(`Interest sent to ${userName} successfully!`);
+    } catch (err: any) {
+      alert(`Error: ${err.message || 'Failed to send interest'}`);
+    } finally {
+      setSendingInterest(null);
+    }
   };
 
-  // Handle viewing detailed profile
-  const handleViewProfile = (id: string) => {
-    // In a real app, this would navigate to a profile page
-    alert(`Viewing detailed profile for #${id}`);
+  const handleCancelInterest = async (userId: string, userName: string) => {
+    if (!window.confirm(`Cancel your interest to ${userName}?`)) return;
+    try {
+      setCancelingInterest(userId);
+      // We need to get the interest ID first
+      const sentInterests = await interestApi.getSentInterests();
+      const interest = sentInterests.interests.find((i: any) => i.to_user_id === userId && i.status === 'pending');
+      if (interest) {
+        await interestApi.cancelInterest(interest.id);
+        await loadUsers();
+        alert(`Interest to ${userName} canceled successfully!`);
+      }
+    } catch (err: any) {
+      alert(`Error: ${err.message || 'Failed to cancel interest'}`);
+    } finally {
+      setCancelingInterest(null);
+    }
+  };
+
+  const getInterestButtonText = (status: string) => {
+    switch (status) {
+      case 'pending_sent': return 'Interest Sent';
+      case 'pending_received': return 'Respond to Interest';
+      case 'accepted': return 'Matched ✓';
+      case 'rejected': return 'Declined';
+      default: return 'Send Interest';
+    }
+  };
+
+  const getInterestButtonClass = (status: string) => {
+    switch (status) {
+      case 'pending_sent': return 'bg-yellow-500 hover:bg-yellow-600 cursor-not-allowed';
+      case 'pending_received': return 'bg-green-600 hover:bg-green-700';
+      case 'accepted': return 'bg-blue-600 hover:bg-blue-700 cursor-default';
+      case 'rejected': return 'bg-gray-400 cursor-not-allowed';
+      default: return 'bg-pink-600 hover:bg-pink-700';
+    }
+  };
+
+  const isButtonDisabled = (status: string, userId: string) => {
+    return status === 'pending_sent' || status === 'accepted' || status === 'rejected' || sendingInterest === userId;
   };
 
   return (
@@ -212,7 +138,7 @@ const FindMatches: React.FC = () => {
         <div className="bg-white rounded-xl shadow-lg p-6">
           <h1 className="text-3xl font-bold text-gray-800 text-center mb-8">Find Your Perfect Match</h1>
 
-          {/* User Profile Status Banner */}
+          {/* Info Banner */}
           <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
             <div className="flex">
               <div className="flex-shrink-0">
@@ -222,7 +148,7 @@ const FindMatches: React.FC = () => {
               </div>
               <div className="ml-3">
                 <p className="text-sm text-blue-700">
-                  Your profile is <span className="font-medium">verified</span>. You can view all potential matches and send interest requests.
+                  You can send interest to users. Maximum 3 mutual interests allowed. Full profiles are visible only after mutual interest.
                 </p>
               </div>
             </div>
@@ -230,10 +156,9 @@ const FindMatches: React.FC = () => {
           
           {/* Filters Section */}
           <div className="bg-gray-50 p-5 rounded-lg mb-8 border border-gray-200">
-            <h2 className="text-xl font-medium text-gray-800 mb-4">Filter Matches</h2>
+            <h2 className="text-xl font-medium text-gray-800 mb-4">Filter Users</h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {/* Location filter */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
                 <input 
@@ -245,22 +170,6 @@ const FindMatches: React.FC = () => {
                 />
               </div>
               
-              {/* Verification status filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Verification Status</label>
-                <select 
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                  value={filters.verificationStatus}
-                  onChange={(e) => handleFilterChange('verificationStatus', e.target.value)}
-                >
-                  <option value="all">All</option>
-                  <option value="verified">Verified Only</option>
-                  <option value="pending">Pending</option>
-                  <option value="unverified">Unverified</option>
-                </select>
-              </div>
-              
-              {/* Religion filter */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Religion</label>
                 <select 
@@ -273,173 +182,197 @@ const FindMatches: React.FC = () => {
                   <option value="Hinduism">Hinduism</option>
                   <option value="Christianity">Christianity</option>
                   <option value="Buddhism">Buddhism</option>
-                  <option value="Other">Other</option>
                 </select>
               </div>
               
-              {/* Match percentage slider */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                <select 
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  value={filters.gender}
+                  onChange={(e) => handleFilterChange('gender', e.target.value)}
+                >
+                  <option value="all">All</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                </select>
+              </div>
+              
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Minimum Match: {filters.minMatchPercentage}%
+                  Age: {filters.minAge} - {filters.maxAge}
                 </label>
-                <input 
-                  type="range" 
-                  min="0" 
-                  max="100" 
-                  step="5"
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                  value={filters.minMatchPercentage}
-                  onChange={(e) => handleFilterChange('minMatchPercentage', parseInt(e.target.value))}
-                />
+                <div className="flex gap-2">
+                  <input 
+                    type="number" 
+                    min="18" 
+                    max="100"
+                    placeholder="Min"
+                    className="w-1/2 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    value={filters.minAge}
+                    onChange={(e) => handleFilterChange('minAge', parseInt(e.target.value) || 18)}
+                  />
+                  <input 
+                    type="number" 
+                    min="18" 
+                    max="100"
+                    placeholder="Max"
+                    className="w-1/2 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    value={filters.maxAge}
+                    onChange={(e) => handleFilterChange('maxAge', parseInt(e.target.value) || 60)}
+                  />
+                </div>
               </div>
             </div>
           </div>
+          
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              </div>
+            </div>
+          )}
           
           {/* Results Section */}
           {loading ? (
             <div className="flex justify-center items-center py-20">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
             </div>
-          ) : filteredMatches.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[70vh] overflow-y-auto p-2">
-              {filteredMatches.map((match) => (
-                <div key={match.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300">
-                  {/* Profile Image and Match Percentage */}
-                  <div className="relative">
-                    <img 
-                      src={match.profilePicture} 
-                      alt={`${match.name}'s profile`}
-                      className="w-full h-60 object-cover object-center"
-                    />
-                    {/* Verification Badge */}
-                    <div className="absolute top-3 right-3">
-                      {match.verificationStatus === 'verified' && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          Verified
-                        </span>
+          ) : filteredUsers.length > 0 ? (
+            <>
+              <p className="text-gray-600 mb-4">Showing {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''}</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[70vh] overflow-y-auto p-2">
+                {filteredUsers.map((user) => (
+                  <div key={user.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300">
+                    {/* Profile Image */}
+                    <div className="relative">
+                      {user.profile_picture ? (
+                        <img 
+                          src={user.profile_picture} 
+                          alt={`${user.name}'s profile`}
+                          className="w-full h-60 object-cover object-center"
+                          onError={(e) => {
+                            e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&size=400&background=random`;
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-60 bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center">
+                          <span className="text-white text-6xl font-bold">{user.name.charAt(0)}</span>
+                        </div>
                       )}
-                      {match.verificationStatus === 'pending' && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                          <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                          </svg>
-                          Pending
-                        </span>
+                      
+                      {/* Interest Status Badge */}
+                      {user.interest_status !== 'none' && (
+                        <div className="absolute top-3 right-3">
+                          {user.interest_status === 'accepted' && (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-500 text-white">
+                              ✓ Matched
+                            </span>
+                          )}
+                          {user.interest_status === 'pending_sent' && (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-500 text-white">
+                              ⏳ Pending
+                            </span>
+                          )}
+                          {user.interest_status === 'pending_received' && (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-500 text-white">
+                              💌 Interested in You
+                            </span>
+                          )}
+                        </div>
                       )}
-                      {match.verificationStatus === 'unverified' && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                          </svg>
-                          Unverified
-                        </span>
-                      )}
-                    </div>
-                    {/* Match Percentage */}
-                    <div className="absolute bottom-3 right-3 bg-indigo-600 text-white rounded-full h-14 w-14 flex items-center justify-center font-bold text-lg shadow-lg">
-                      {match.matchPercentage}%
-                    </div>
                     </div>
                     
                     {/* Profile Details */}
-                    <div className="p-5 flex flex-col">
-                    <div className="flex justify-between items-start">
-                      <h3 className="text-xl font-bold text-gray-800">{match.name}, {match.age}</h3>
-                    </div>
-                    
-                    <div className="mt-2 text-sm text-gray-600 space-y-1">
-                      <div className="flex items-center">
-                        <svg className="h-4 w-4 text-gray-400 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                        </svg>
-                        {match.location}
-                      </div>                      <div className="flex items-center">
-                        <svg className="h-4 w-4 text-gray-400 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
-                        </svg>
-                        {match.profession}
+                    <div className="p-5">
+                      <h3 className="text-xl font-bold text-gray-800">{user.name}, {user.age}</h3>
+                      
+                      <div className="mt-2 text-sm text-gray-600 space-y-1">
+                        {user.location && (
+                          <div className="flex items-center">
+                            <svg className="h-4 w-4 text-gray-400 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                            </svg>
+                            {user.location}
+                          </div>
+                        )}
+                        
+                        {user.profession && (
+                          <div className="flex items-center">
+                            <svg className="h-4 w-4 text-gray-400 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
+                            </svg>
+                            {user.profession}
+                          </div>
+                        )}
+                        
+                        {user.religion && (
+                          <div className="flex items-center">
+                            <svg className="h-4 w-4 text-gray-400 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M3 12v3c0 1.657 3.134 3 7 3s7-1.343 7-3v-3c0 1.657-3.134 3-7 3s-7-1.343-7-3z" />
+                            </svg>
+                            {user.religion}
+                          </div>
+                        )}
+                        
+                        {user.academic_background && (
+                          <div className="flex items-center">
+                            <svg className="h-4 w-4 text-gray-400 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" />
+                            </svg>
+                            {user.academic_background}
+                          </div>
+                        )}
                       </div>
                       
-                      <div className="flex items-center">
-                        <svg className="h-4 w-4 text-gray-400 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M3 12v3c0 1.657 3.134 3 7 3s7-1.343 7-3v-3c0 1.657-3.134 3-7 3s-7-1.343-7-3z" />
-                          <path d="M3 7v3c0 1.657 3.134 3 7 3s7-1.343 7-3V7c0 1.657-3.134 3-7 3S3 8.657 3 7z" />
-                          <path d="M17 5c0 1.657-3.134 3-7 3S3 6.657 3 5s3.134-3 7-3 7 1.343 7 3z" />
-                        </svg>
-                        {match.religion}
-                      </div>
-                    </div>
-                    
-                    {/* Interests */}
-                    <div className="mt-3">
-                      <p className="text-xs text-gray-500 mb-1.5">Interests:</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {match.interests.map((interest, index) => (
-                          <span 
-                            key={index}
-                            className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full text-xs"
+                      {/* Action Button */}
+                      <div className="mt-4">
+                        {user.interest_status === 'pending_sent' ? (
+                          <div className="space-y-2">
+                            <button 
+                              disabled
+                              className="w-full bg-yellow-500 text-white py-2 px-4 rounded-md font-medium cursor-not-allowed opacity-70"
+                            >
+                              Interest Sent
+                            </button>
+                            <button 
+                              onClick={() => handleCancelInterest(user.id, user.name)}
+                              disabled={cancelingInterest === user.id}
+                              className="w-full bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-md font-medium transition-colors disabled:opacity-50"
+                            >
+                              {cancelingInterest === user.id ? 'Canceling...' : 'Cancel Interest'}
+                            </button>
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={() => user.interest_status === 'none' && handleSendInterest(user.id, user.name)}
+                            disabled={isButtonDisabled(user.interest_status, user.id)}
+                            className={`w-full ${getInterestButtonClass(user.interest_status)} text-white py-2 px-4 rounded-md font-medium transition-colors disabled:opacity-70`}
                           >
-                            {interest}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    {/* Match Criteria */}
-                    <div className="mt-3">
-                      <p className="text-xs text-gray-500 mb-1.5">Why you match:</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {match.matchCriteria.location && (
-                          <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs">
-                            Location
-                          </span>
-                        )}
-                        {match.matchCriteria.religion && (
-                          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">
-                            Religion
-                          </span>
-                        )}
-                        {match.matchCriteria.age && (
-                          <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs">
-                            Age
-                          </span>
-                        )}
-                        {match.matchCriteria.interests && (
-                          <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs">
-                            Interests
-                          </span>
+                            {sendingInterest === user.id ? 'Sending...' : getInterestButtonText(user.interest_status)}
+                          </button>
                         )}
                       </div>
-                    </div>
-                    
-                    {/* Action Buttons */}
-                    <div className="mt-4 flex space-x-3">
-                      <button 
-                        onClick={() => handleSendInterest(match.id)}
-                        className="flex-1 bg-pink-600 hover:bg-pink-700 text-white py-2 px-4 rounded-md font-medium transition-colors"
-                      >
-                        Send Interest
-                      </button>
-                      <button 
-                        onClick={() => handleViewProfile(match.id)}
-                        className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 py-2 px-4 rounded-md font-medium transition-colors"
-                      >
-                        View Profile
-                      </button>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </>
           ) : (
             <div className="text-center py-16">
               <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
               </svg>
-              <h3 className="mt-4 text-lg font-medium text-gray-900">No matches found</h3>
+              <h3 className="mt-4 text-lg font-medium text-gray-900">No users found</h3>
               <p className="mt-2 text-sm text-gray-500">Try adjusting your filters or check back later.</p>
             </div>
           )}

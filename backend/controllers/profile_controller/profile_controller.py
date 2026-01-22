@@ -413,3 +413,136 @@ async def get_medical_documents(
     except Exception as e:
         print(f"Error fetching medical documents: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/users/browse")
+async def browse_users(
+    authorization: str = Header(None),
+    db: Session = Depends(get_db)
+):
+    """Get brief profiles of all users for browsing (excluding current user)"""
+    try:
+        # Get current user ID
+        current_user_id = get_current_user_id(authorization, db)
+        
+        # Import here to avoid circular import
+        from repositories.interest_repository.interest_repository import InterestRepository
+        from models.profile.profile import Profile
+        
+        # Get all users except the current user
+        users = db.query(User).filter(
+            User.id != current_user_id,
+            User.is_deleted == False
+        ).all()
+        
+        result = []
+        for user in users:
+            profile = ProfileRepository.get_by_user_id(db, user.id)
+            
+            # Determine interest status with this user
+            interest_status = "none"
+            
+            # Check if current user sent interest to this user
+            sent_interest = InterestRepository.get_existing_interest(db, current_user_id, user.id)
+            if sent_interest:
+                if sent_interest.status == "pending":
+                    interest_status = "pending_sent"
+                elif sent_interest.status == "accepted":
+                    interest_status = "accepted"
+                elif sent_interest.status == "rejected":
+                    interest_status = "rejected"
+            
+            # Check if this user sent interest to current user
+            received_interest = InterestRepository.get_existing_interest(db, user.id, current_user_id)
+            if received_interest:
+                if received_interest.status == "pending":
+                    interest_status = "pending_received"
+                elif received_interest.status == "accepted":
+                    interest_status = "accepted"
+            
+            # Convert profile picture to base64 if exists
+            profile_picture_base64 = None
+            if profile and profile.profile_picture_data:
+                try:
+                    encoded = base64.b64encode(profile.profile_picture_data).decode('utf-8')
+                    content_type = profile.profile_picture_content_type or "image/jpeg"
+                    profile_picture_base64 = f"data:{content_type};base64,{encoded}"
+                except Exception as e:
+                    print(f"Error encoding profile picture: {e}")
+            
+            # Build brief profile
+            user_brief = {
+                "id": user.id,
+                "name": user.name,
+                "age": user.age,
+                "gender": user.gender,
+                "religion": user.religion,
+                "location": profile.location if profile else None,
+                "profession": profile.profession if profile else None,
+                "academic_background": profile.academic_background if profile else None,
+                "profile_picture": profile_picture_base64,
+                "interest_status": interest_status
+            }
+            
+            result.append(user_brief)
+        
+        return JSONResponse(content={"users": result}, status_code=200)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error browsing users: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/users/{user_id}/profile/full")
+async def get_full_profile(
+    user_id: str,
+    authorization: str = Header(None),
+    db: Session = Depends(get_db)
+):
+    """Get full profile of a user (only if mutual interest exists)"""
+    try:
+        # Get current user ID
+        current_user_id = get_current_user_id(authorization, db)
+        
+        # Import here to avoid circular import
+        from repositories.interest_repository.interest_repository import InterestRepository
+        
+        # Check if mutual interest exists
+        has_mutual_interest = InterestRepository.check_mutual_interest(db, current_user_id, user_id)
+        
+        if not has_mutual_interest:
+            raise HTTPException(
+                status_code=403,
+                detail="You can only view full profiles of users with mutual interest"
+            )
+        
+        # Get user and profile
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        profile = ProfileRepository.get_by_user_id(db, user_id)
+        if not profile:
+            raise HTTPException(status_code=404, detail="Profile not found")
+        
+        # Return full profile with all details
+        full_profile = {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "age": user.age,
+            "gender": user.gender,
+            "religion": user.religion,
+            "nid": user.nid,
+            "profile": profile.to_dict()
+        }
+        
+        return JSONResponse(content=full_profile, status_code=200)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching full profile: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

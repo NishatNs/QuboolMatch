@@ -5,6 +5,8 @@ from controllers.auth_controller import auth_controller
 from controllers.verification_controller import verification_controller
 from controllers.admin_controller import admin_controller
 from controllers.profile_controller import profile_controller
+from controllers.interest_controller import interest_controller
+from controllers.notification_controller import notification_controller
 from create_db import create_database
 from middlewares import cors_middleware
 from middlewares import static_middleware
@@ -26,3 +28,5 @@ app.include_router(auth_controller.router, prefix="/auth", tags=["auth"])
 app.include_router(verification_controller.router, prefix="/verification", tags=["verification"])
 app.include_router(admin_controller.router, prefix="/admin", tags=["admin"])
 app.include_router(profile_controller.router, prefix="/api", tags=["profile"])
+app.include_router(interest_controller.router, prefix="/api", tags=["interests"])
+app.include_router(notification_controller.router, prefix="/api", tags=["notifications"])
