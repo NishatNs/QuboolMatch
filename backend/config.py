@@ -12,7 +12,7 @@ class DevSettings(Settings):
     """Development settings class"""
     DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:mim123@localhost:5432/")
     DATABASE_NAME = os.getenv("DATABASE_NAME", "qubool")
-    GEMINI_API_KEY = "AIzaSyB30LDWlo3jG4BD54dPPP620VSY9KEFKN4"
+    GEMINI_API_KEY = "AIzaSyDTH8GXNGKUYCtfdor0JyHY4VXkVqaGuFA"
 class TestSettings(Settings):
     """Test settings class"""
     DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@db/")
