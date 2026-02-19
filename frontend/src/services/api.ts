@@ -22,9 +22,9 @@ const handleResponse = async (response: Response) => {
 // ==================== INTEREST ENDPOINTS ====================
 
 export const interestApi = {
-  // Browse all users
-  browseUsers: async () => {
-    const response = await fetch(`${API_BASE_URL}/api/users/browse`, {
+  // Browse all users with pagination
+  browseUsers: async (page: number = 1, limit: number = 20) => {
+    const response = await fetch(`${API_BASE_URL}/api/users/browse?page=${page}&limit=${limit}`, {
       method: 'GET',
       headers: getAuthHeaders()
     });
@@ -89,6 +89,15 @@ export const interestApi = {
   // Get matches (accepted interests)
   getMatches: async () => {
     const response = await fetch(`${API_BASE_URL}/api/interests/matches`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  // Get ML-ranked recommendations with pagination
+  getRecommendations: async (page: number = 1, limit: number = 20) => {
+    const response = await fetch(`${API_BASE_URL}/api/users/recommendations?page=${page}&limit=${limit}`, {
       method: 'GET',
       headers: getAuthHeaders()
     });

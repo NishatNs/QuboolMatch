@@ -13,15 +13,38 @@ interface User {
   academic_background: string | null;
   profile_picture: string | null;
   interest_status: 'none' | 'pending_sent' | 'pending_received' | 'accepted' | 'rejected';
+  // Overview fields
+  marital_status?: string | null;
+  height?: number | null;
+  weight?: number | null;
+  interests?: string | null;
+  hobbies?: string | null;
+  dietary_preference?: string | null;
+  smoking_habit?: string | null;
+  alcohol_consumption?: string | null;
+  overall_health_status?: string | null;
+  blood_group?: string | null;
+  preferred_age_min?: number | null;
+  preferred_age_max?: number | null;
+  living_with_in_laws?: string | null;
+  willing_to_relocate?: boolean | null;
 }
+
+type ViewMode = 'all' | 'recommended';
 
 const FindMatches: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sendingInterest, setSendingInterest] = useState<string | null>(null);
   const [cancelingInterest, setCancelingInterest] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('all');
+  const [mlReady, setMlReady] = useState<boolean>(false);
+  const [page, setPage] = useState<number>(1);
+  const [hasMore, setHasMore] = useState<boolean>(true);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   
   const [filters, setFilters] = useState({
     location: '',
@@ -33,22 +56,68 @@ const FindMatches: React.FC = () => {
 
   // Load users on component mount
   useEffect(() => {
-    loadUsers();
+    setPage(1);
+    loadUsers(viewMode, 1);
   }, []);
 
-  const loadUsers = async () => {
+  // Reload when view mode changes
+  useEffect(() => {
+    setPage(1);
+    setUsers([]);
+    setFilteredUsers([]);
+    loadUsers(viewMode, 1);
+  }, [viewMode]);
+
+  const loadUsers = async (mode: ViewMode = 'all', pageNum: number = 1, append: boolean = false) => {
     try {
-      setLoading(true);
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
       setError(null);
-      const response = await interestApi.browseUsers();
-      setUsers(response.users);
-      setFilteredUsers(response.users);
+      let response;
+      if (mode === 'recommended') {
+        response = await interestApi.getRecommendations(pageNum, 20);
+        const ready = response.ml_ready ?? false;
+        setMlReady(ready);
+        if (!ready) {
+          setError('AI recommendation model is not trained yet. Please run "python retrain_model.py" in the backend to enable this feature.');
+          setUsers([]);
+          setFilteredUsers([]);
+          setHasMore(false);
+          return;
+        }
+      } else {
+        response = await interestApi.browseUsers(pageNum, 20);
+        setMlReady(false);
+      }
+      
+      const newUsers = response.users;
+      const pagination = response.pagination;
+      
+      if (append) {
+        setUsers(prev => [...prev, ...newUsers]);
+        setFilteredUsers(prev => [...prev, ...newUsers]);
+      } else {
+        setUsers(newUsers);
+        setFilteredUsers(newUsers);
+      }
+      
+      setHasMore(pagination?.has_more ?? false);
     } catch (err: any) {
       setError(err.message || 'Failed to load users');
       console.error('Error loading users:', err);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
+  };
+
+  const loadMoreUsers = () => {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    loadUsers(viewMode, nextPage, true);
   };
 
   // Apply filters when filter state changes
@@ -80,7 +149,8 @@ const FindMatches: React.FC = () => {
     try {
       setSendingInterest(userId);
       await interestApi.sendInterest(userId, `Hi ${userName}, I'd like to connect with you!`);
-      await loadUsers();
+      setPage(1);
+      await loadUsers(viewMode, 1);
       alert(`Interest sent to ${userName} successfully!`);
     } catch (err: any) {
       alert(`Error: ${err.message || 'Failed to send interest'}`);
@@ -98,7 +168,8 @@ const FindMatches: React.FC = () => {
       const interest = sentInterests.interests.find((i: any) => i.to_user_id === userId && i.status === 'pending');
       if (interest) {
         await interestApi.cancelInterest(interest.id);
-        await loadUsers();
+        setPage(1);
+        await loadUsers(viewMode, 1);
         alert(`Interest to ${userName} canceled successfully!`);
       }
     } catch (err: any) {
@@ -136,9 +207,43 @@ const FindMatches: React.FC = () => {
     <div className="min-h-screen bg-gray-100 py-8">
       <div className="container mx-auto px-4">
         <div className="bg-white rounded-xl shadow-lg p-6">
-          <h1 className="text-3xl font-bold text-gray-800 text-center mb-8">Find Your Perfect Match</h1>
+          <h1 className="text-3xl font-bold text-gray-800 text-center mb-6">Find Your Perfect Match</h1>
 
-          {/* Info Banner */}
+          {/* View Mode Toggle */}
+          <div className="flex justify-center mb-6">
+            <div className="inline-flex rounded-lg border border-gray-200 bg-gray-100 p-1">
+              <button
+                onClick={() => setViewMode('all')}
+                className={`px-5 py-2 rounded-md text-sm font-medium transition-all ${
+                  viewMode === 'all'
+                    ? 'bg-white text-gray-800 shadow'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                All Profiles
+              </button>
+              <button
+                onClick={() => setViewMode('recommended')}
+                className={`px-5 py-2 rounded-md text-sm font-medium transition-all ${
+                  viewMode === 'recommended'
+                    ? 'bg-white text-pink-600 shadow'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                ✨ Recommended
+              </button>
+            </div>
+          </div>
+
+          {/* AI badge — only shown when model is ready in recommended mode */}
+          {viewMode === 'recommended' && mlReady && (
+            <div className="flex items-center justify-center mb-4">
+              <span className="inline-flex items-center gap-1 bg-pink-50 text-pink-700 border border-pink-200 text-xs font-medium px-3 py-1 rounded-full">
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM6.343 5.343a1 1 0 00-1.414 1.414l.707.707A1 1 0 007.05 6.05l-.707-.707zM3 10a1 1 0 100 2h1a1 1 0 100-2H3zM14.657 5.343a1 1 0 010 1.414l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 10a1 1 0 100 2h-1a1 1 0 100-2h1zM10 17a1 1 0 100-2h-.01a1 1 0 100 2H10zM7.05 13.95a1 1 0 010 1.414l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 0zM13.657 13.95a1 1 0 00-1.414 0l-.707.707a1 1 0 001.414 1.414l.707-.707a1 1 0 000-1.414z"/></svg>
+                Ranked by AI · Based on your profile compatibility
+              </span>
+            </div>
+          )}
           <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
             <div className="flex">
               <div className="flex-shrink-0">
@@ -247,7 +352,7 @@ const FindMatches: React.FC = () => {
             <div className="flex justify-center items-center py-20">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
             </div>
-          ) : filteredUsers.length > 0 ? (
+          ) : error ? null : filteredUsers.length > 0 ? (
             <>
               <p className="text-gray-600 mb-4">Showing {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''}</p>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[70vh] overflow-y-auto p-2">
@@ -334,8 +439,21 @@ const FindMatches: React.FC = () => {
                         )}
                       </div>
                       
-                      {/* Action Button */}
-                      <div className="mt-4">
+                      {/* Action Buttons */}
+                      <div className="mt-4 space-y-2">
+                        {/* View Overview Button */}
+                        <button
+                          onClick={() => setSelectedUser(user)}
+                          className="w-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-2 px-4 rounded-md font-medium transition-colors flex items-center justify-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          View Overview
+                        </button>
+                        
+                        {/* Interest Action Buttons */}
                         {user.interest_status === 'pending_sent' ? (
                           <div className="space-y-2">
                             <button 
@@ -366,6 +484,29 @@ const FindMatches: React.FC = () => {
                   </div>
                 ))}
               </div>
+              
+              {/* Load More Button */}
+              {hasMore && !loading && (
+                <div className="mt-8 text-center">
+                  <button
+                    onClick={loadMoreUsers}
+                    disabled={loadingMore}
+                    className="inline-flex items-center px-6 py-3 bg-pink-600 hover:bg-pink-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Loading...
+                      </>
+                    ) : (
+                      'Load More Profiles'
+                    )}
+                  </button>
+                </div>
+              )}
             </>
           ) : (
             <div className="text-center py-16">
@@ -378,6 +519,235 @@ const FindMatches: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Profile Overview Modal */}
+      {selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedUser(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-gradient-to-r from-pink-500 to-purple-600 text-white p-6 rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  {selectedUser.profile_picture ? (
+                    <img 
+                      src={selectedUser.profile_picture} 
+                      alt={selectedUser.name}
+                      className="w-16 h-16 rounded-full object-cover border-4 border-white shadow-lg"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-white bg-opacity-20 flex items-center justify-center border-4 border-white shadow-lg">
+                      <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  )}
+                  <div>
+                    <h2 className="text-2xl font-bold">{selectedUser.name}, {selectedUser.age}</h2>
+                    <p className="text-pink-100">{selectedUser.gender}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSelectedUser(null)}
+                  className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6">
+              {/* Basic Information */}
+              <section>
+                <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-pink-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" />
+                  </svg>
+                  Basic Information
+                </h3>
+                <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
+                  {selectedUser.religion && (
+                    <div>
+                      <p className="text-sm text-gray-600">Religion</p>
+                      <p className="font-medium text-gray-900">{selectedUser.religion}</p>
+                    </div>
+                  )}
+                  {selectedUser.location && (
+                    <div>
+                      <p className="text-sm text-gray-600">Location</p>
+                      <p className="font-medium text-gray-900">{selectedUser.location}</p>
+                    </div>
+                  )}
+                  {selectedUser.profession && (
+                    <div>
+                      <p className="text-sm text-gray-600">Profession</p>
+                      <p className="font-medium text-gray-900">{selectedUser.profession}</p>
+                    </div>
+                  )}
+                  {selectedUser.academic_background && (
+                    <div>
+                      <p className="text-sm text-gray-600">Education</p>
+                      <p className="font-medium text-gray-900">{selectedUser.academic_background}</p>
+                    </div>
+                  )}
+                  {selectedUser.marital_status && (
+                    <div>
+                      <p className="text-sm text-gray-600">Marital Status</p>
+                      <p className="font-medium text-gray-900 capitalize">{selectedUser.marital_status}</p>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* Physical Attributes */}
+              {(selectedUser.height || selectedUser.weight || selectedUser.blood_group) && (
+                <section>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-pink-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 2a1 1 0 00-1 1v1a1 1 0 002 0V3a1 1 0 00-1-1zM4 4h3a3 3 0 006 0h3a2 2 0 012 2v9a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2zm2.5 7a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm2.45 4a2.5 2.5 0 10-4.9 0h4.9zM12 9a1 1 0 100 2h3a1 1 0 100-2h-3zm-1 4a1 1 0 011-1h2a1 1 0 110 2h-2a1 1 0 01-1-1z" clipRule="evenodd" />
+                    </svg>
+                    Physical Attributes & Health
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-lg">
+                    {selectedUser.height && (
+                      <div>
+                        <p className="text-sm text-gray-600">Height</p>
+                        <p className="font-medium text-gray-900">{selectedUser.height} cm</p>
+                      </div>
+                    )}
+                    {selectedUser.weight && (
+                      <div>
+                        <p className="text-sm text-gray-600">Weight</p>
+                        <p className="font-medium text-gray-900">{selectedUser.weight} kg</p>
+                      </div>
+                    )}
+                    {selectedUser.blood_group && (
+                      <div>
+                        <p className="text-sm text-gray-600">Blood Group</p>
+                        <p className="font-medium text-gray-900">{selectedUser.blood_group}</p>
+                      </div>
+                    )}
+                    {selectedUser.overall_health_status && (
+                      <div className="col-span-2 md:col-span-3">
+                        <p className="text-sm text-gray-600">Health Status</p>
+                        <p className="font-medium text-gray-900 capitalize">{selectedUser.overall_health_status}</p>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
+
+              {/* Lifestyle & Habits */}
+              {(selectedUser.dietary_preference || selectedUser.smoking_habit || selectedUser.alcohol_consumption) && (
+                <section>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-pink-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 0l-2 2a1 1 0 101.414 1.414L8 10.414l1.293 1.293a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    Lifestyle & Habits
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-lg">
+                    {selectedUser.dietary_preference && (
+                      <div>
+                        <p className="text-sm text-gray-600">Diet</p>
+                        <p className="font-medium text-gray-900 capitalize">{selectedUser.dietary_preference}</p>
+                      </div>
+                    )}
+                    {selectedUser.smoking_habit && (
+                      <div>
+                        <p className="text-sm text-gray-600">Smoking</p>
+                        <p className="font-medium text-gray-900 capitalize">{selectedUser.smoking_habit}</p>
+                      </div>
+                    )}
+                    {selectedUser.alcohol_consumption && (
+                      <div>
+                        <p className="text-sm text-gray-600">Alcohol</p>
+                        <p className="font-medium text-gray-900 capitalize">{selectedUser.alcohol_consumption}</p>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
+
+              {/* Interests & Hobbies */}
+              {(selectedUser.interests || selectedUser.hobbies) && (
+                <section>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-pink-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                    Interests & Hobbies
+                  </h3>
+                  <div className="bg-gradient-to-br from-pink-50 to-purple-50 p-4 rounded-lg space-y-3">
+                    {selectedUser.interests && (
+                      <div>
+                        <p className="text-sm font-medium text-gray-700 mb-2">Interests</p>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedUser.interests.split(',').map((interest, idx) => (
+                            <span key={idx} className="px-3 py-1 bg-white rounded-full text-sm text-pink-700 border border-pink-200 shadow-sm">
+                              {interest.trim()}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {selectedUser.hobbies && (
+                      <div>
+                        <p className="text-sm font-medium text-gray-700 mb-2">Hobbies</p>
+                        <p className="text-gray-900">{selectedUser.hobbies}</p>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
+
+              {/* Partner Preferences */}
+              {(selectedUser.preferred_age_min || selectedUser.living_with_in_laws || selectedUser.willing_to_relocate !== null) && (
+                <section>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-pink-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+                    </svg>
+                    Partner Preferences
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
+                    {selectedUser.preferred_age_min && selectedUser.preferred_age_max && (
+                      <div>
+                        <p className="text-sm text-gray-600">Preferred Age Range</p>
+                        <p className="font-medium text-gray-900">{selectedUser.preferred_age_min} - {selectedUser.preferred_age_max} years</p>
+                      </div>
+                    )}
+                    {selectedUser.living_with_in_laws && (
+                      <div>
+                        <p className="text-sm text-gray-600">Living with In-Laws</p>
+                        <p className="font-medium text-gray-900 capitalize">{selectedUser.living_with_in_laws}</p>
+                      </div>
+                    )}
+                    {selectedUser.willing_to_relocate !== null && (
+                      <div>
+                        <p className="text-sm text-gray-600">Willing to Relocate</p>
+                        <p className="font-medium text-gray-900">{selectedUser.willing_to_relocate ? 'Yes' : 'No'}</p>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="sticky bottom-0 bg-gray-50 p-6 rounded-b-2xl border-t border-gray-200">
+              <button
+                onClick={() => setSelectedUser(null)}
+                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white py-3 px-6 rounded-lg font-medium transition-all shadow-md hover:shadow-lg"
+              >
+                Close Overview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

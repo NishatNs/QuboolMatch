@@ -12,3 +12,7 @@ pytest-asyncio==0.21.0
 requests==2.32.3
 responses==0.25.3
 google-genai
+joblib
+scikit-learn
+pandas
+numpy

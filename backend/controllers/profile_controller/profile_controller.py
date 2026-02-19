@@ -417,23 +417,37 @@ async def get_medical_documents(
 
 @router.get("/users/browse")
 async def browse_users(
+    page: int = 1,
+    limit: int = 20,
     authorization: str = Header(None),
     db: Session = Depends(get_db)
 ):
-    """Get brief profiles of all users for browsing (excluding current user)"""
+    """Get brief profiles of all users for browsing (excluding current user) with pagination"""
     try:
+        print(f"[BROWSE] Starting browse_users endpoint (page={page}, limit={limit})...")
         # Get current user ID
         current_user_id = get_current_user_id(authorization, db)
+        print(f"[BROWSE] Current user ID: {current_user_id}")
         
         # Import here to avoid circular import
         from repositories.interest_repository.interest_repository import InterestRepository
         from models.profile.profile import Profile
         
-        # Get all users except the current user
+        # Calculate offset
+        offset = (page - 1) * limit
+        
+        # Get total count
+        total_count = db.query(User).filter(
+            User.id != current_user_id,
+            User.is_deleted == False
+        ).count()
+        
+        # Get paginated users
         users = db.query(User).filter(
             User.id != current_user_id,
             User.is_deleted == False
-        ).all()
+        ).offset(offset).limit(limit).all()
+        print(f"[BROWSE] Found {len(users)} users on page {page} (total: {total_count})")
         
         result = []
         for user in users:
@@ -470,7 +484,7 @@ async def browse_users(
                 except Exception as e:
                     print(f"Error encoding profile picture: {e}")
             
-            # Build brief profile
+            # Build brief profile with overview fields
             user_brief = {
                 "id": user.id,
                 "name": user.name,
@@ -481,17 +495,174 @@ async def browse_users(
                 "profession": profile.profession if profile else None,
                 "academic_background": profile.academic_background if profile else None,
                 "profile_picture": profile_picture_base64,
-                "interest_status": interest_status
+                "interest_status": interest_status,
+                # Additional overview fields
+                "marital_status": profile.marital_status if profile else None,
+                "height": profile.height if profile else None,
+                "weight": profile.weight if profile else None,
+                "interests": profile.interests if profile else None,
+                "hobbies": profile.hobbies if profile else None,
+                "dietary_preference": profile.dietary_preference if profile else None,
+                "smoking_habit": profile.smoking_habit if profile else None,
+                "alcohol_consumption": profile.alcohol_consumption if profile else None,
+                "overall_health_status": profile.overall_health_status if profile else None,
+                "blood_group": profile.blood_group if profile else None,
+                "preferred_age_min": profile.preferred_age_min if profile else None,
+                "preferred_age_max": profile.preferred_age_max if profile else None,
+                "living_with_in_laws": profile.living_with_in_laws if profile else None,
+                "willing_to_relocate": profile.willing_to_relocate if profile else None
             }
             
             result.append(user_brief)
         
-        return JSONResponse(content={"users": result}, status_code=200)
+        has_more = (offset + len(result)) < total_count
+        
+        print(f"[BROWSE] Returning {len(result)} users (has_more: {has_more})")
+        return JSONResponse(content={
+            "users": result,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total": total_count,
+                "has_more": has_more
+            }
+        }, status_code=200)
     
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error browsing users: {e}")
+        print(f"[BROWSE ERROR] {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/users/recommendations")
+async def get_recommendations(
+    page: int = 1,
+    limit: int = 20,
+    authorization: str = Header(None),
+    db: Session = Depends(get_db)
+):
+    """Get ML-ranked profile recommendations for the current user with pagination.
+    Falls back to the regular browse list if the model is not trained yet."""
+    try:
+        print(f"[RECOMMENDATIONS] Starting recommendations endpoint (page={page}, limit={limit})...")
+        current_user_id = get_current_user_id(authorization, db)
+        print(f"[RECOMMENDATIONS] Current user ID: {current_user_id}")
+
+        from repositories.interest_repository.interest_repository import InterestRepository
+        from services.recommendation_service import get_recommendations as ml_recommend, is_ready
+
+        print("[RECOMMENDATIONS] Checking if ML model is ready...")
+        # Get ML-ranked user_id list (or None if model not ready) - fetch more for pagination
+        ranked_ids = ml_recommend(current_user_id, db, top_n=200)
+        ml_ready = ranked_ids is not None
+        print(f"[RECOMMENDATIONS] ML ready: {ml_ready}, Ranked IDs count: {len(ranked_ids) if ranked_ids else 0}")
+
+        # Fall back: all users except self
+        if not ml_ready:
+            print("[RECOMMENDATIONS] ML not ready, falling back to all users")
+            users = db.query(User).filter(
+                User.id != current_user_id,
+                User.is_deleted == False
+            ).all()
+            ranked_ids = [u.id for u in users]
+            print(f"[RECOMMENDATIONS] Fallback found {len(ranked_ids)} users")
+
+        # Apply pagination to ranked_ids
+        total_count = len(ranked_ids)
+        offset = (page - 1) * limit
+        paginated_ids = ranked_ids[offset:offset + limit]
+        
+        result = []
+        print(f"[RECOMMENDATIONS] Processing {len(paginated_ids)} user IDs from page {page}...")
+        for uid in paginated_ids:
+            user = db.query(User).filter(User.id == uid).first()
+            if not user or user.is_deleted:
+                continue
+
+            profile = ProfileRepository.get_by_user_id(db, uid)
+
+            # Interest status
+            interest_status = "none"
+            sent_interest = InterestRepository.get_existing_interest(db, current_user_id, uid)
+            if sent_interest:
+                if sent_interest.status == "pending":
+                    interest_status = "pending_sent"
+                elif sent_interest.status == "accepted":
+                    interest_status = "accepted"
+                elif sent_interest.status == "rejected":
+                    interest_status = "rejected"
+
+            received_interest = InterestRepository.get_existing_interest(db, uid, current_user_id)
+            if received_interest:
+                if received_interest.status == "pending":
+                    interest_status = "pending_received"
+                elif received_interest.status == "accepted":
+                    interest_status = "accepted"
+
+            # Profile picture
+            profile_picture_base64 = None
+            if profile and profile.profile_picture_data:
+                try:
+                    encoded = base64.b64encode(profile.profile_picture_data).decode('utf-8')
+                    content_type = profile.profile_picture_content_type or "image/jpeg"
+                    profile_picture_base64 = f"data:{content_type};base64,{encoded}"
+                except Exception as e:
+                    print(f"Error encoding profile picture: {e}")
+
+            result.append({
+                "id": user.id,
+                "name": user.name,
+                "age": user.age,
+                "gender": user.gender,
+                "religion": user.religion,
+                "location": profile.location if profile else None,
+                "profession": profile.profession if profile else None,
+                "academic_background": profile.academic_background if profile else None,
+                "profile_picture": profile_picture_base64,
+                "interest_status": interest_status,
+                # Additional overview fields
+                "marital_status": profile.marital_status if profile else None,
+                "height": profile.height if profile else None,
+                "weight": profile.weight if profile else None,
+                "interests": profile.interests if profile else None,
+                "hobbies": profile.hobbies if profile else None,
+                "dietary_preference": profile.dietary_preference if profile else None,
+                "smoking_habit": profile.smoking_habit if profile else None,
+                "alcohol_consumption": profile.alcohol_consumption if profile else None,
+                "overall_health_status": profile.overall_health_status if profile else None,
+                "blood_group": profile.blood_group if profile else None,
+                "preferred_age_min": profile.preferred_age_min if profile else None,
+                "preferred_age_max": profile.preferred_age_max if profile else None,
+                "living_with_in_laws": profile.living_with_in_laws if profile else None,
+                "willing_to_relocate": profile.willing_to_relocate if profile else None
+            })
+
+        has_more = (offset + len(result)) < total_count
+        
+        print(f"[RECOMMENDATIONS] Returning {len(result)} users, ml_ready={ml_ready}, has_more={has_more}")
+        return JSONResponse(
+            content={
+                "users": result,
+                "ml_ready": ml_ready,
+                "pagination": {
+                    "page": page,
+                    "limit": limit,
+                    "total": total_count,
+                    "has_more": has_more
+                }
+            },
+            status_code=200
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[RECOMMENDATIONS ERROR] {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
