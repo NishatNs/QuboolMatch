@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { interestApi } from "../services/api";
+import { useNavigate } from "react-router-dom";
 
 // Define the structure for a user from the API
 interface User {
@@ -33,6 +34,7 @@ interface User {
 type ViewMode = 'all' | 'recommended';
 
 const FindMatches: React.FC = () => {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -470,6 +472,20 @@ const FindMatches: React.FC = () => {
                               {cancelingInterest === user.id ? 'Canceling...' : 'Cancel Interest'}
                             </button>
                           </div>
+                        ) : user.interest_status === 'accepted' ? (
+                          <button
+                            onClick={() => navigate(`/messages?user=${encodeURIComponent(user.id)}&name=${encodeURIComponent(user.name)}`)}
+                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md font-medium transition-colors"
+                          >
+                            Message
+                          </button>
+                        ) : user.interest_status === 'pending_received' ? (
+                          <button
+                            onClick={() => navigate('/interest-requests')}
+                            className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-md font-medium transition-colors"
+                          >
+                            Respond to Interest
+                          </button>
                         ) : (
                           <button 
                             onClick={() => user.interest_status === 'none' && handleSendInterest(user.id, user.name)}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getAccessToken } from '../services/api';
 
 interface NIDImageDisplayProps {
   userId?: string; // If provided, shows image for specific user (admin view)
@@ -22,7 +23,7 @@ const NIDImageDisplay: React.FC<NIDImageDisplayProps> = ({
         setError(null);
 
         // Get auth token
-        const token = localStorage.getItem('accessToken');
+        const token = getAccessToken();
         if (!token) {
           throw new Error('Authentication required');
         }

@@ -1,74 +1,188 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { interestApi, notificationApi } from "../services/api";
 
 interface Notification {
   id: string;
-  type: "interest_received" | "interest_accepted" | "profile_view" | "match" | "system";
-  fromUserId?: string;
-  fromUserName?: string;
-  fromUserImage?: string;
+  type: "interest_received" | "interest_accepted" | "interest_rejected" | "new_message" | "system";
+  from_user_id?: string;
+  from_user?: {
+    id: string;
+    name: string;
+    age: number;
+    profile_picture: string | null;
+  };
   message: string;
-  timestamp: string; // ISO date string
-  isRead: boolean;
+  created_at: string;
+  is_read: boolean;
+  related_id?: string;
+  interest_action_status?: "accepted" | "rejected";
 }
 
+type InterestActionStatus = "accepted" | "rejected";
+
+const HANDLED_INTEREST_NOTIFICATION_KEY = "handledInterestNotifications";
+
+const readHandledInterestNotificationMap = (): Record<string, InterestActionStatus> => {
+  try {
+    const raw = sessionStorage.getItem(HANDLED_INTEREST_NOTIFICATION_KEY);
+    if (!raw) {
+      return {};
+    }
+    return JSON.parse(raw) as Record<string, InterestActionStatus>;
+  } catch {
+    return {};
+  }
+};
+
+const writeHandledInterestNotificationMap = (map: Record<string, InterestActionStatus>) => {
+  try {
+    sessionStorage.setItem(HANDLED_INTEREST_NOTIFICATION_KEY, JSON.stringify(map));
+  } catch {
+    // Ignore storage errors.
+  }
+};
+
+const applyHandledInterestStatus = (items: Notification[]): Notification[] => {
+  const handledMap = readHandledInterestNotificationMap();
+  return items.map((item) => {
+    const handledStatus = handledMap[item.id];
+    if (item.type !== "interest_received" || !handledStatus) {
+      return item;
+    }
+
+    const suffix = handledStatus === "accepted"
+      ? "(You accepted this request)"
+      : "(You rejected this request)";
+    const nextMessage = item.message.includes(suffix) ? item.message : `${item.message} ${suffix}`;
+
+    return {
+      ...item,
+      is_read: true,
+      interest_action_status: handledStatus,
+      message: nextMessage,
+    };
+  });
+};
+
 const NotificationDropdown: React.FC = () => {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const toggleDropdown = () => {
+  const toggleDropdown = async () => {
     setIsOpen(!isOpen);
     if (!isOpen) {
-      fetchNotifications();
+      await fetchNotifications();
     }
   };
 
-  const fetchNotifications = () => {
+  const fetchNotifications = async () => {
     setLoading(true);
-    // In a real app, this would be an API call
-    setTimeout(() => {
-      const dummyNotifications: Notification[] = [
-        {
-          id: "1",
-          type: "interest_received",
-          fromUserId: "7",
-          fromUserName: "Sharmin Akter",
-          fromUserImage: "https://randomuser.me/api/portraits/women/33.jpg",
-          message: "Sharmin has shown interest in your profile",
-          timestamp: new Date(Date.now() - 30 * 60000).toISOString(), // 30 minutes ago
-          isRead: false
-        },
-        {
-          id: "4",
-          type: "interest_accepted",
-          fromUserId: "1",
-          fromUserName: "Ayesha Rahman",
-          fromUserImage: "https://randomuser.me/api/portraits/women/44.jpg",
-          message: "Ayesha accepted your interest request",
-          timestamp: new Date(Date.now() - 1 * 86400000).toISOString(), // 1 day ago
-          isRead: false
-        },
-        {
-          id: "2",
-          type: "match",
-          fromUserId: "5",
-          fromUserName: "Tasneem Begum",
-          fromUserImage: "https://randomuser.me/api/portraits/women/90.jpg",
-          message: "You and Tasneem are now matched!",
-          timestamp: new Date(Date.now() - 2 * 3600000).toISOString(), // 2 hours ago
-          isRead: true
-        }
-      ];
-
-      setNotifications(dummyNotifications);
+    try {
+      const response = await notificationApi.getNotifications();
+      const items = applyHandledInterestStatus(response.notifications || []);
+      setNotifications(items);
+    } catch (error) {
+      console.error("Failed to fetch notifications:", error);
+    } finally {
       setLoading(false);
-    }, 500);
+    }
+  };
+
+  const markAsRead = async (notificationId: string) => {
+    const target = notifications.find((n) => n.id === notificationId);
+    if (!target || target.is_read) {
+      return;
+    }
+
+    setNotifications((prev) => prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n)));
+    try {
+      await notificationApi.markAsRead(notificationId);
+    } catch (error) {
+      console.error("Failed to mark notification as read:", error);
+      await fetchNotifications();
+    }
+  };
+
+  const handleNotificationClick = async (notification: Notification) => {
+    await markAsRead(notification.id);
+
+    if (notification.type === "interest_received") {
+      setIsOpen(false);
+      navigate("/interest-requests");
+      return;
+    }
+
+    if (notification.type === "interest_accepted" && notification.from_user_id) {
+      const userName = notification.from_user?.name ?? "Match";
+      setIsOpen(false);
+      navigate(`/messages?user=${encodeURIComponent(notification.from_user_id)}&name=${encodeURIComponent(userName)}`);
+      return;
+    }
+
+    if (notification.type === "new_message" && notification.from_user_id) {
+      const userName = notification.from_user?.name ?? "User";
+      setIsOpen(false);
+      navigate(`/messages?user=${encodeURIComponent(notification.from_user_id)}&name=${encodeURIComponent(userName)}`);
+      return;
+    }
+
+    setIsOpen(false);
+    navigate("/notifications");
+  };
+
+  const handleInterestAction = async (notification: Notification, action: "accept" | "reject") => {
+    if (!notification.related_id) {
+      return;
+    }
+
+    setActionLoading((prev) => ({ ...prev, [notification.id]: true }));
+    try {
+      if (action === "accept") {
+        await interestApi.acceptInterest(notification.related_id);
+      } else {
+        await interestApi.rejectInterest(notification.related_id);
+      }
+
+      const handledStatus: InterestActionStatus = action === "accept" ? "accepted" : "rejected";
+      const existingMap = readHandledInterestNotificationMap();
+      writeHandledInterestNotificationMap({
+        ...existingMap,
+        [notification.id]: handledStatus,
+      });
+
+      setNotifications((prev) =>
+        prev.map((item) => {
+          if (item.id !== notification.id) {
+            return item;
+          }
+          return {
+            ...item,
+            is_read: true,
+            interest_action_status: handledStatus,
+            message:
+              action === "accept"
+                ? `${item.message} (You accepted this request)`
+                : `${item.message} (You rejected this request)`,
+          };
+        })
+      );
+
+      await markAsRead(notification.id);
+    } catch (error) {
+      console.error(`Failed to ${action} interest:`, error);
+      await fetchNotifications();
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [notification.id]: false }));
+    }
   };
 
   useEffect(() => {
-    fetchNotifications();
+    void fetchNotifications();
     
     // Close dropdown when clicking outside
     const handleClickOutside = (event: MouseEvent) => {
@@ -102,7 +216,7 @@ const NotificationDropdown: React.FC = () => {
     }
   };
 
-  const unreadCount = notifications.filter(notification => !notification.isRead).length;
+  const unreadCount = notifications.filter((notification) => !notification.is_read).length;
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -156,39 +270,67 @@ const NotificationDropdown: React.FC = () => {
               ) : notifications.length > 0 ? (
                 <div>
                   {notifications.map((notification) => (
-                    <Link
+                    <div
                       key={notification.id}
-                      to={notification.fromUserId ? `/profile/${notification.fromUserId}` : "/notifications"}
-                      className={`block px-4 py-3 hover:bg-gray-50 border-b border-gray-100 transition-colors ${
-                        !notification.isRead ? 'bg-blue-50' : ''
-                      }`}
-                      onClick={() => setIsOpen(false)}
+                      className={`border-b border-gray-100 ${!notification.is_read ? 'bg-blue-50' : ''}`}
                     >
+                      <button
+                        type="button"
+                        className="w-full text-left block px-4 py-3 hover:bg-gray-50 transition-colors"
+                        onClick={() => void handleNotificationClick(notification)}
+                      >
                       <div className="flex items-center">
-                        {notification.fromUserImage && (
+                        {notification.from_user?.profile_picture && (
                           <div className="flex-shrink-0 mr-3">
                             <img
                               className="h-10 w-10 rounded-full object-cover"
-                              src={notification.fromUserImage}
-                              alt={notification.fromUserName || "User"}
+                              src={notification.from_user.profile_picture}
+                              alt={notification.from_user.name || "User"}
                             />
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
-                          <p className={`text-sm ${!notification.isRead ? 'font-semibold' : 'font-normal'} text-gray-900 truncate`}>
+                          <p className={`text-sm ${!notification.is_read ? 'font-semibold' : 'font-normal'} text-gray-900 truncate`}>
                             {notification.message}
                           </p>
                           <p className="text-xs text-gray-500 mt-1">
-                            {formatTimestamp(notification.timestamp)}
+                            {formatTimestamp(notification.created_at)}
                           </p>
                         </div>
-                        {!notification.isRead && (
+                        {!notification.is_read && (
                           <div className="ml-2 flex-shrink-0">
                             <span className="inline-block h-2 w-2 rounded-full bg-indigo-600"></span>
                           </div>
                         )}
                       </div>
-                    </Link>
+                      </button>
+                      {notification.type === "interest_received" && notification.related_id && !notification.interest_action_status && (
+                        <div className="px-4 pb-3 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleInterestAction(notification, "accept");
+                            }}
+                            disabled={Boolean(actionLoading[notification.id])}
+                            className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-md disabled:opacity-50"
+                          >
+                            {actionLoading[notification.id] ? "Working..." : "Confirm"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleInterestAction(notification, "reject");
+                            }}
+                            disabled={Boolean(actionLoading[notification.id])}
+                            className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md disabled:opacity-50"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               ) : (

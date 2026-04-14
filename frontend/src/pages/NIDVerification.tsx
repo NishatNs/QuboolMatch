@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import NIDImageDisplay from "../components/NIDImageDisplay";
 import RecentImageDisplay from "../components/RecentImageDisplay";
+import { getAccessToken } from "../services/api";
 
 const NIDVerification: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -20,7 +21,7 @@ const NIDVerification: React.FC = () => {
   useEffect(() => {
     const fetchVerificationStatus = async () => {
       try {
-        const token = localStorage.getItem('accessToken');
+        const token = getAccessToken();
         if (!token) return;
 
         const response = await fetch("http://localhost:8000/verification/status", {
@@ -108,7 +109,7 @@ const NIDVerification: React.FC = () => {
       }
 
       // Get auth token from localStorage
-      const token = localStorage.getItem('accessToken');
+      const token = getAccessToken();
       if (!token) {
         throw new Error("You must be logged in to submit verification");
       }

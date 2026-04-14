@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { notificationApi } from "../services/api";
+import { interestApi, notificationApi } from "../services/api";
 
 // Define notification types from backend
 interface Notification {
   id: string;
-  type: "interest_received" | "interest_accepted" | "interest_rejected" | "system";
+  type: "interest_received" | "interest_accepted" | "interest_rejected" | "new_message" | "system";
   from_user_id?: string;
   from_user?: {
     id: string;
@@ -17,13 +17,61 @@ interface Notification {
   created_at: string;
   is_read: boolean;
   related_id?: string;
+  interest_action_status?: 'accepted' | 'rejected';
 }
+
+type InterestActionStatus = 'accepted' | 'rejected';
+
+const HANDLED_INTEREST_NOTIFICATION_KEY = 'handledInterestNotifications';
+
+const readHandledInterestNotificationMap = (): Record<string, InterestActionStatus> => {
+  try {
+    const raw = sessionStorage.getItem(HANDLED_INTEREST_NOTIFICATION_KEY);
+    if (!raw) {
+      return {};
+    }
+    return JSON.parse(raw) as Record<string, InterestActionStatus>;
+  } catch {
+    return {};
+  }
+};
+
+const writeHandledInterestNotificationMap = (map: Record<string, InterestActionStatus>) => {
+  try {
+    sessionStorage.setItem(HANDLED_INTEREST_NOTIFICATION_KEY, JSON.stringify(map));
+  } catch {
+    // Ignore storage errors.
+  }
+};
+
+const applyHandledInterestStatus = (items: Notification[]): Notification[] => {
+  const handledMap = readHandledInterestNotificationMap();
+  return items.map((item) => {
+    const handledStatus = handledMap[item.id];
+    if (item.type !== 'interest_received' || !handledStatus) {
+      return item;
+    }
+
+    const suffix = handledStatus === 'accepted'
+      ? '(You accepted this request)'
+      : '(You rejected this request)';
+    const nextMessage = item.message.includes(suffix) ? item.message : `${item.message} ${suffix}`;
+
+    return {
+      ...item,
+      is_read: true,
+      interest_action_status: handledStatus,
+      message: nextMessage,
+    };
+  });
+};
 
 const Notifications: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -35,7 +83,8 @@ const Notifications: React.FC = () => {
       setLoading(true);
       setError(null);
       const response = await notificationApi.getNotifications();
-      setNotifications(response.notifications);
+      const items = applyHandledInterestStatus(response.notifications || []);
+      setNotifications(items);
       setUnreadCount(response.unread_count);
     } catch (err: any) {
       setError(err.message || 'Failed to load notifications');
@@ -90,13 +139,65 @@ const Notifications: React.FC = () => {
   };
 
   const handleNotificationClick = (notification: Notification) => {
-    markAsRead(notification.id);
+    void markAsRead(notification.id);
     
     // Navigate based on notification type
     if (notification.type === "interest_received") {
-      navigate(`/find-matches`);
-    } else if (notification.type === "interest_accepted") {
-      navigate(`/find-matches`);
+      navigate(`/interest-requests`);
+    } else if (notification.type === "interest_accepted" && notification.from_user_id) {
+      const userName = notification.from_user?.name || 'Match';
+      navigate(`/messages?user=${encodeURIComponent(notification.from_user_id)}&name=${encodeURIComponent(userName)}`);
+    } else if (notification.type === "new_message" && notification.from_user_id) {
+      const userName = notification.from_user?.name || 'User';
+      navigate(`/messages?user=${encodeURIComponent(notification.from_user_id)}&name=${encodeURIComponent(userName)}`);
+    } else if (notification.type === "interest_rejected") {
+      navigate(`/interest-requests`);
+    }
+  };
+
+  const handleInterestAction = async (notification: Notification, action: 'accept' | 'reject') => {
+    if (!notification.related_id) {
+      return;
+    }
+
+    try {
+      setActionLoading((prev) => ({ ...prev, [notification.id]: true }));
+      if (action === 'accept') {
+        await interestApi.acceptInterest(notification.related_id);
+      } else {
+        await interestApi.rejectInterest(notification.related_id);
+      }
+
+      const handledStatus: InterestActionStatus = action === 'accept' ? 'accepted' : 'rejected';
+      const existingMap = readHandledInterestNotificationMap();
+      writeHandledInterestNotificationMap({
+        ...existingMap,
+        [notification.id]: handledStatus,
+      });
+
+      setNotifications((prevNotifications) =>
+        prevNotifications.map((item) => {
+          if (item.id !== notification.id) {
+            return item;
+          }
+          return {
+            ...item,
+            is_read: true,
+            interest_action_status: handledStatus,
+            message:
+              action === 'accept'
+                ? `${item.message} (You accepted this request)`
+                : `${item.message} (You rejected this request)`,
+          };
+        })
+      );
+
+      await markAsRead(notification.id);
+    } catch (err: any) {
+      setError(err.message || `Failed to ${action} interest request`);
+      await loadNotifications();
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [notification.id]: false }));
     }
   };
 
@@ -110,6 +211,8 @@ const Notifications: React.FC = () => {
         return "❌";
       case "system":
         return "🔔";
+      case "new_message":
+        return "💬";
       default:
         return "📬";
     }
@@ -125,6 +228,8 @@ const Notifications: React.FC = () => {
         return "bg-red-50 border-red-200";
       case "system":
         return "bg-blue-50 border-blue-200";
+      case "new_message":
+        return "bg-indigo-50 border-indigo-200";
       default:
         return "bg-gray-50 border-gray-200";
     }
@@ -283,6 +388,33 @@ const Notifications: React.FC = () => {
                       </svg>
                     </button>
                   </div>
+
+                  {notification.type === 'interest_received' && notification.related_id && !notification.interest_action_status && (
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleInterestAction(notification, 'accept');
+                        }}
+                        disabled={Boolean(actionLoading[notification.id])}
+                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md disabled:opacity-50"
+                      >
+                        {actionLoading[notification.id] ? 'Processing...' : 'Confirm'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleInterestAction(notification, 'reject');
+                        }}
+                        disabled={Boolean(actionLoading[notification.id])}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md disabled:opacity-50"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

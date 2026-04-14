@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { interestApi } from "../services/api";
+import { useNavigate } from "react-router-dom";
 
 interface Interest {
   id: string;
@@ -25,13 +26,44 @@ interface Interest {
   };
 }
 
+interface FullProfileResponse {
+  id: string;
+  name: string;
+  email: string;
+  age: number;
+  gender: string;
+  religion: string | null;
+  nid: string;
+  profile: {
+    location?: string | null;
+    profession?: string | null;
+    academic_background?: string | null;
+    marital_status?: string | null;
+    hobbies?: string | null;
+    interests?: string | null;
+    overall_health_status?: string | null;
+    blood_group?: string | null;
+    dietary_preference?: string | null;
+    smoking_habit?: string | null;
+    alcohol_consumption?: string | null;
+    preferred_age_min?: number | null;
+    preferred_age_max?: number | null;
+    preferred_religion?: string | null;
+    preferred_location?: string | null;
+    willing_to_relocate?: boolean | null;
+    additional_comments?: string | null;
+  };
+}
+
 const InterestRequests: React.FC = () => {
+  const navigate = useNavigate();
   const [receivedInterests, setReceivedInterests] = useState<Interest[]>([]);
   const [sentInterests, setSentInterests] = useState<Interest[]>([]);
   const [activeTab, setActiveTab] = useState<'received' | 'sent'>('received');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [fullProfile, setFullProfile] = useState<FullProfileResponse | null>(null);
 
   useEffect(() => {
     loadInterests();
@@ -57,14 +89,16 @@ const InterestRequests: React.FC = () => {
     }
   };
 
-  const handleAcceptInterest = async (interestId: string, userName: string) => {
+  const handleAcceptInterest = async (interestId: string, userId: string, userName: string) => {
     if (!window.confirm(`Accept interest from ${userName}?`)) return;
     
     try {
       setProcessingId(interestId);
       await interestApi.acceptInterest(interestId);
+      const profileResponse = await interestApi.getFullProfile(userId);
+      setFullProfile(profileResponse as FullProfileResponse);
       await loadInterests();
-      alert(`You and ${userName} are now matched!`);
+      alert(`You and ${userName} are now matched! Full profile unlocked.`);
     } catch (err: any) {
       alert(`Error: ${err.message || 'Failed to accept interest'}`);
     } finally {
@@ -171,7 +205,7 @@ const InterestRequests: React.FC = () => {
             {interest.status === 'pending' && type === 'received' ? (
               <div className="flex flex-col gap-2">
                 <button
-                  onClick={() => handleAcceptInterest(interest.id, user.name)}
+                  onClick={() => handleAcceptInterest(interest.id, user.id, user.name)}
                   disabled={processingId === interest.id}
                   className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md disabled:opacity-50"
                 >
@@ -193,6 +227,16 @@ const InterestRequests: React.FC = () => {
               >
                 {processingId === interest.id ? 'Canceling...' : 'Cancel'}
               </button>
+            ) : interest.status === 'accepted' ? (
+              <div className="flex flex-col gap-2 items-end">
+                {getStatusBadge(interest.status)}
+                <button
+                  onClick={() => navigate(`/messages?user=${encodeURIComponent(user.id)}&name=${encodeURIComponent(user.name)}`)}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-md"
+                >
+                  Message
+                </button>
+              </div>
             ) : (
               getStatusBadge(interest.status)
             )}
@@ -243,6 +287,81 @@ const InterestRequests: React.FC = () => {
                 </div>
                 <div className="ml-3">
                   <p className="text-sm text-red-700">{error}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Full profile modal after mutual accept */}
+          {fullProfile && (
+            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+              <div className="w-full max-w-2xl bg-white rounded-xl shadow-2xl max-h-[90vh] overflow-y-auto">
+                <div className="p-6 border-b border-gray-200">
+                  <h2 className="text-2xl font-bold text-gray-800">{fullProfile.name}'s Full Profile</h2>
+                  <p className="text-sm text-gray-500 mt-1">Unlocked after mutual interest</p>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div><span className="font-semibold text-gray-700">Age:</span> {fullProfile.age}</div>
+                    <div><span className="font-semibold text-gray-700">Gender:</span> {fullProfile.gender}</div>
+                    <div><span className="font-semibold text-gray-700">Religion:</span> {fullProfile.religion || 'Not specified'}</div>
+                    <div><span className="font-semibold text-gray-700">Location:</span> {fullProfile.profile.location || 'Not specified'}</div>
+                    <div><span className="font-semibold text-gray-700">Profession:</span> {fullProfile.profile.profession || 'Not specified'}</div>
+                    <div><span className="font-semibold text-gray-700">Education:</span> {fullProfile.profile.academic_background || 'Not specified'}</div>
+                  </div>
+
+                  <div className="rounded-lg border border-gray-200 p-4">
+                    <h3 className="font-semibold text-gray-800 mb-3">Lifestyle & Health</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                      <div><span className="font-semibold text-gray-700">Health:</span> {fullProfile.profile.overall_health_status || 'Not specified'}</div>
+                      <div><span className="font-semibold text-gray-700">Blood Group:</span> {fullProfile.profile.blood_group || 'Not specified'}</div>
+                      <div><span className="font-semibold text-gray-700">Diet:</span> {fullProfile.profile.dietary_preference || 'Not specified'}</div>
+                      <div><span className="font-semibold text-gray-700">Smoking:</span> {fullProfile.profile.smoking_habit || 'Not specified'}</div>
+                      <div><span className="font-semibold text-gray-700">Alcohol:</span> {fullProfile.profile.alcohol_consumption || 'Not specified'}</div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-gray-200 p-4">
+                    <h3 className="font-semibold text-gray-800 mb-2">About</h3>
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                      {fullProfile.profile.hobbies || fullProfile.profile.interests || fullProfile.profile.additional_comments || 'No additional details shared yet.'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-gray-200 p-4">
+                    <h3 className="font-semibold text-gray-800 mb-3">Partner Preferences</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <span className="font-semibold text-gray-700">Preferred Age:</span>{' '}
+                        {fullProfile.profile.preferred_age_min ?? 'Any'} - {fullProfile.profile.preferred_age_max ?? 'Any'}
+                      </div>
+                      <div><span className="font-semibold text-gray-700">Preferred Religion:</span> {fullProfile.profile.preferred_religion || 'Not specified'}</div>
+                      <div><span className="font-semibold text-gray-700">Preferred Location:</span> {fullProfile.profile.preferred_location || 'Not specified'}</div>
+                      <div>
+                        <span className="font-semibold text-gray-700">Relocate:</span>{' '}
+                        {fullProfile.profile.willing_to_relocate == null ? 'Not specified' : fullProfile.profile.willing_to_relocate ? 'Yes' : 'No'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6 border-t border-gray-200 flex flex-col sm:flex-row gap-3 sm:justify-end">
+                  <button
+                    onClick={() => {
+                      navigate(`/messages?user=${encodeURIComponent(fullProfile.id)}`);
+                      setFullProfile(null);
+                    }}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md"
+                  >
+                    Start Chat
+                  </button>
+                  <button
+                    onClick={() => setFullProfile(null)}
+                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded-md"
+                  >
+                    Close
+                  </button>
                 </div>
               </div>
             </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getAccessToken } from '../services/api';
 
 interface RecentImageDisplayProps {
   userId?: string; // If provided, shows image for specific user (admin view)
@@ -36,7 +37,7 @@ const RecentImageDisplay: React.FC<RecentImageDisplayProps> = ({
         setError(null);
 
         // Get auth token
-        const token = localStorage.getItem('accessToken');
+        const token = getAccessToken();
         if (!token) {
           throw new Error('Authentication required');
         }

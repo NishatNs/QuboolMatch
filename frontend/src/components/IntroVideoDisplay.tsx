@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getAccessToken } from '../services/api';
 
 interface IntroVideoDisplayProps {
   userId?: string;
@@ -36,7 +37,7 @@ const IntroVideoDisplay: React.FC<IntroVideoDisplayProps> = ({
         setError(null);
 
         // Get auth token
-        const token = localStorage.getItem('accessToken');
+        const token = getAccessToken();
         if (!token) {
           throw new Error('Authentication required');
         }

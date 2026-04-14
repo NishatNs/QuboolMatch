@@ -110,6 +110,14 @@ class InterestRepository:
         return interest is not None
 
     @staticmethod
+    def check_accepted_interest_between(db: Session, user1_id: str, user2_id: str) -> bool:
+        """
+        Check whether there is at least one accepted interest between two users,
+        regardless of who sent it.
+        """
+        return InterestRepository.check_mutual_interest(db, user1_id, user2_id)
+
+    @staticmethod
     def get_existing_interest(db: Session, from_user_id: str, to_user_id: str) -> Optional[Interest]:
         """
         Check if an interest already exists between two users.

@@ -555,14 +555,18 @@ async def get_recommendations(
         from services.recommendation_service import get_recommendations as ml_recommend, is_ready
 
         print("[RECOMMENDATIONS] Checking if ML model is ready...")
-        # Get ML-ranked user_id list (or None if model not ready) - fetch more for pagination
-        ranked_ids = ml_recommend(current_user_id, db, top_n=200)
-        ml_ready = ranked_ids is not None
+        ml_ready = is_ready()
+
+        # Get ML-ranked user_id list (or None if user not in model index) - fetch more for pagination
+        ranked_ids = ml_recommend(current_user_id, db, top_n=200) if ml_ready else None
         print(f"[RECOMMENDATIONS] ML ready: {ml_ready}, Ranked IDs count: {len(ranked_ids) if ranked_ids else 0}")
 
-        # Fall back: all users except self
-        if not ml_ready:
-            print("[RECOMMENDATIONS] ML not ready, falling back to all users")
+        # Fall back: all users except self when model is unavailable OR returns no candidates.
+        if not ranked_ids:
+            if ml_ready:
+                print("[RECOMMENDATIONS] Model ready but returned no ranked users, falling back to all users")
+            else:
+                print("[RECOMMENDATIONS] ML not ready, falling back to all users")
             users = db.query(User).filter(
                 User.id != current_user_id,
                 User.is_deleted == False

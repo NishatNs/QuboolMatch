@@ -1,9 +1,13 @@
 // API Service for backend communication
-const API_BASE_URL = 'http://localhost:8000';
+export const API_BASE_URL = 'http://localhost:8000';
+
+export const getAccessToken = (): string | null => {
+  return sessionStorage.getItem('accessToken') || localStorage.getItem('accessToken');
+};
 
 // Helper function to get auth headers
 const getAuthHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('accessToken');
+  const token = getAccessToken();
   return {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {})
@@ -154,6 +158,56 @@ export const notificationApi = {
   }
 };
 
+// ==================== MESSAGE ENDPOINTS ====================
+
+export const messageApi = {
+  // Send message to a matched user
+  sendMessage: async (toUserId: string, content: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/messages/send`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ to_user_id: toUserId, content })
+    });
+    return handleResponse(response);
+  },
+
+  // Get conversation summaries
+  getConversations: async () => {
+    const response = await fetch(`${API_BASE_URL}/api/messages/conversations`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  // Get a chat thread with one user
+  getThread: async (otherUserId: string, limit: number = 100) => {
+    const response = await fetch(`${API_BASE_URL}/api/messages/thread/${otherUserId}?limit=${limit}`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  // Mark thread as read
+  markThreadAsRead: async (otherUserId: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/messages/thread/${otherUserId}/read`, {
+      method: 'PUT',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  // Get total unread message count
+  getUnreadCount: async () => {
+    const response = await fetch(`${API_BASE_URL}/api/messages/unread-count`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  }
+};
+
 // ==================== AUTH ENDPOINTS ====================
 
 export const authApi = {
@@ -179,5 +233,6 @@ export const authApi = {
 export default {
   interest: interestApi,
   notification: notificationApi,
+  message: messageApi,
   auth: authApi
 };

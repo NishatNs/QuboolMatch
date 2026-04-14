@@ -1,11 +1,85 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { messageApi, notificationApi } from '../services/api';
 
 const Navbar: React.FC = () => {
   const { isLoggedIn, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [messageUnreadCount, setMessageUnreadCount] = useState(0);
+  const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
+
+  const refreshBadges = async () => {
+    if (!isLoggedIn) {
+      setMessageUnreadCount(0);
+      setNotificationUnreadCount(0);
+      return;
+    }
+
+    try {
+      const [messageRes, notificationRes] = await Promise.all([
+        messageApi.getUnreadCount(),
+        notificationApi.getNotifications(),
+      ]);
+
+      setMessageUnreadCount(Number(messageRes?.unread_count || 0));
+      setNotificationUnreadCount(Number(notificationRes?.unread_count || 0));
+    } catch (error) {
+      console.error('Failed to refresh navbar badges:', error);
+    }
+  };
+
+  const clearMessageUnread = async () => {
+    setMessageUnreadCount(0);
+    try {
+      const conversationResponse = await messageApi.getConversations();
+      const conversations = conversationResponse?.conversations || [];
+      const toMark = conversations.filter((c: any) => (c?.unread_count || 0) > 0);
+      await Promise.all(toMark.map((c: any) => messageApi.markThreadAsRead(c.user.id)));
+    } catch (error) {
+      console.error('Failed to clear message unread count:', error);
+    }
+  };
+
+  const clearNotificationUnread = async () => {
+    setNotificationUnreadCount(0);
+    try {
+      await notificationApi.markAllAsRead();
+    } catch (error) {
+      console.error('Failed to clear notification unread count:', error);
+    }
+  };
+
+  useEffect(() => {
+    void refreshBadges();
+    if (!isLoggedIn) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void refreshBadges();
+    }, 8000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      return;
+    }
+
+    if (location.pathname === '/messages' || location.pathname === '/chat') {
+      void clearMessageUnread();
+    }
+
+    if (location.pathname === '/notifications') {
+      void clearNotificationUnread();
+    }
+  }, [location.pathname, isLoggedIn]);
 
   const handleLogout = () => {
     logout();
@@ -38,7 +112,8 @@ const Navbar: React.FC = () => {
             {isLoggedIn && (
               <>
                 <NavLink to="/matches">Matches</NavLink>
-                <NavLink to="/notifications">Notifications</NavLink>
+                <NavLink to="/messages" badgeCount={messageUnreadCount}>Messages</NavLink>
+                <NavLink to="/notifications" badgeCount={notificationUnreadCount}>Notifications</NavLink>
                 <NavLink to="/nid-verification">Verification</NavLink>
               </>
             )}
@@ -122,7 +197,8 @@ const Navbar: React.FC = () => {
               {isLoggedIn && (
                 <>
                   <MobileNavLink to="/matches" onClick={() => setIsMobileMenuOpen(false)}>Matches</MobileNavLink>
-                  <MobileNavLink to="/notifications" onClick={() => setIsMobileMenuOpen(false)}>Notifications</MobileNavLink>
+                  <MobileNavLink to="/messages" badgeCount={messageUnreadCount} onClick={() => setIsMobileMenuOpen(false)}>Messages</MobileNavLink>
+                  <MobileNavLink to="/notifications" badgeCount={notificationUnreadCount} onClick={() => setIsMobileMenuOpen(false)}>Notifications</MobileNavLink>
                   <MobileNavLink to="/nid-verification" onClick={() => setIsMobileMenuOpen(false)}>Verification</MobileNavLink>
                   <MobileNavLink to="/profile" onClick={() => setIsMobileMenuOpen(false)}>Profile</MobileNavLink>
                 </>
@@ -175,23 +251,33 @@ const Navbar: React.FC = () => {
 };
 
 // Desktop Nav Link Component
-const NavLink: React.FC<{ to: string; children: React.ReactNode }> = ({ to, children }) => (
+const NavLink: React.FC<{ to: string; children: React.ReactNode; badgeCount?: number }> = ({ to, children, badgeCount = 0 }) => (
   <Link
     to={to}
-    className="px-3 py-2 rounded-lg text-gray-700 hover:text-primary-700 hover:bg-primary-50 transition-all duration-200 font-medium"
+    className="px-3 py-2 rounded-lg text-gray-700 hover:text-primary-700 hover:bg-primary-50 transition-all duration-200 font-medium inline-flex items-center gap-2"
   >
-    {children}
+    <span>{children}</span>
+    {badgeCount > 0 && (
+      <span className="min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-red-600 text-white text-[11px] font-bold leading-none">
+        {badgeCount > 99 ? '99+' : badgeCount}
+      </span>
+    )}
   </Link>
 );
 
 // Mobile Nav Link Component
-const MobileNavLink: React.FC<{ to: string; children: React.ReactNode; onClick: () => void }> = ({ to, children, onClick }) => (
+const MobileNavLink: React.FC<{ to: string; children: React.ReactNode; onClick: () => void; badgeCount?: number }> = ({ to, children, onClick, badgeCount = 0 }) => (
   <Link
     to={to}
     onClick={onClick}
-    className="px-4 py-2.5 rounded-lg text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-all duration-200 font-medium"
+    className="px-4 py-2.5 rounded-lg text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-all duration-200 font-medium inline-flex items-center gap-2"
   >
-    {children}
+    <span>{children}</span>
+    {badgeCount > 0 && (
+      <span className="min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-red-600 text-white text-[11px] font-bold leading-none">
+        {badgeCount > 99 ? '99+' : badgeCount}
+      </span>
+    )}
   </Link>
 );
 

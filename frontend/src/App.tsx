@@ -1,13 +1,11 @@
 ﻿
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Navbar from "./components/Navbar";
 import Home from "./components/Home";
 import About from "./components/About";
 import WhyChooseUs from "./components/WhyChooseUs";
 import Services from "./components/Services";
 import Testimonials from "./components/Testimonials";
 import Contact from "./components/Contact";
-import Footer from "./components/Footer";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import NIDVerification from "./pages/NIDVerification";
@@ -15,6 +13,7 @@ import ProfilePage from "./pages/ProfilePage";
 import FindMatches from "./pages/FindMatches";
 import Notifications from "./pages/Notifications";
 import InterestRequests from "./pages/InterestRequests";
+import Messages from "./pages/Messages";
 import { AuthProvider } from "./context/AuthContext";
 import { AdminProvider } from "./context/AdminContext";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -67,11 +66,17 @@ function App(): JSX.Element {
                 <Layout><InterestRequests /></Layout>
               </ProtectedRoute>
             } />
+            <Route path="/messages" element={
+              <ProtectedRoute>
+                <Layout><Messages /></Layout>
+              </ProtectedRoute>
+            } />
             
             {/* Direct access routes for development */}
             <Route path="/matches" element={<Layout><FindMatches /></Layout>} />
             <Route path="/notifications" element={<Layout><Notifications /></Layout>} />
             <Route path="/interests" element={<Layout><InterestRequests /></Layout>} />
+            <Route path="/chat" element={<Layout><Messages /></Layout>} />
             <Route path="/verify" element={<Layout><NIDVerification /></Layout>} />
           </Routes>
         </Router>

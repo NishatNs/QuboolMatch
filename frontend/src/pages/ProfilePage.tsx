@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { getAccessToken } from "../services/api";
 import IntroVideoDisplay from "../components/IntroVideoDisplay";
 import MedicalDocumentsDisplay from "../components/MedicalDocumentsDisplay";
 
@@ -268,7 +269,7 @@ const ProfilePage: React.FC = () => {
     e.preventDefault();
     
     try {
-      const token = localStorage.getItem('accessToken');
+      const token = getAccessToken();
       
       if (!token) {
         alert('Please sign in first');
@@ -371,7 +372,7 @@ const ProfilePage: React.FC = () => {
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        const token = localStorage.getItem('accessToken');
+        const token = getAccessToken();
         
         if (!token) {
           return; // User not logged in
