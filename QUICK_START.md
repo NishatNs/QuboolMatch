@@ -8,6 +8,35 @@ All backend components for the interest and notification system have been succes
 
 ## 🚀 How to Test
 
+## 🐳 Docker (Local)
+
+### Build and Start
+
+```powershell
+cd .
+copy .env.example .env
+docker compose build
+docker compose up -d
+```
+
+Frontend: http://localhost:5173
+
+Backend: http://localhost:8000/docs
+
+Database: localhost:5434
+
+### Run Migrations (manual)
+
+```powershell
+docker compose --profile tools run --rm backend-migrate
+```
+
+### One-Time Seed (manual)
+
+```powershell
+docker compose run --rm backend python seed_ml_data.py
+```
+
 ### Step 1: Start the Backend Server
 
 ```powershell

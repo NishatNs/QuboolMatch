@@ -180,9 +180,9 @@ def insert_batch(users_batch, profiles_batch):
         conn.execute(
             text("""
                 INSERT INTO users
-                (id, name, email, hashed_password, gender, nid, age, religion, is_demo, is_admin, created_at, verification_status)
+                (id, name, email, hashed_password, gender, nid, age, religion, is_demo, is_admin, is_deleted, created_at, verification_status)
                 VALUES
-                (:id, :name, :email, :hashed_password, :gender, :nid, :age, :religion, :is_demo, :is_admin, :created_at, :verification_status)
+                (:id, :name, :email, :hashed_password, :gender, :nid, :age, :religion, :is_demo, :is_admin, :is_deleted, :created_at, :verification_status)
                 ON CONFLICT (email) DO NOTHING
             """),
             users_batch
@@ -221,6 +221,16 @@ def insert_batch(users_batch, profiles_batch):
 
 
 def seed(limit=LIMIT):
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS is_demo BOOLEAN NOT NULL DEFAULT FALSE
+                """
+            )
+        )
+
     if not CSV_PATH.exists():
         raise FileNotFoundError(f"CSV not found at: {CSV_PATH}")
 
@@ -261,6 +271,7 @@ def seed(limit=LIMIT):
             "religion": religion,
             "is_demo": True,
             "is_admin": False,
+            "is_deleted": False,
             "created_at": datetime.now(timezone.utc),
             "verification_status": "verified"  # Mark demo users as verified
         })

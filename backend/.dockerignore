@@ -1,0 +1,14 @@
+.git
+.devcontainer
+.venv
+venv_new
+__pycache__
+.pytest_cache
+*.pyc
+*.pyo
+*.ipynb
+node_modules
+.envrc
+.env
+*.log
+test_*.py

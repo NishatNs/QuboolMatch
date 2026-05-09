@@ -365,7 +365,9 @@ async def get_matches(
 ):
     """Get all accepted interests (matches) for the current user."""
     try:
+        print(f"[MATCHES] Fetching matches for user_id={current_user.id}")
         matches = InterestRepository.get_all_accepted(db, current_user.id)
+        print(f"[MATCHES] Found {len(matches)} accepted interests")
         
         # Enrich with other user's information
         result = []
@@ -378,6 +380,10 @@ async def get_matches(
             
             other_user = UserRepository.get_by_id(db, other_user_id)
             other_profile = ProfileRepository.get_by_user_id(db, other_user_id)
+            print(
+                f"[MATCHES] interest_id={interest.id} other_user_id={other_user_id} "
+                f"user_exists={other_user is not None} profile_exists={other_profile is not None}"
+            )
             
             # Convert profile picture to base64 if exists
             profile_picture_base64 = None

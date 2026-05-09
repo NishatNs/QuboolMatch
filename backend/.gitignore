@@ -82,3 +82,6 @@ coverage.xml
 # Logs and databases
 *.log
 *.sqlite3
+
+# Local seed data
+ml_artifacts/clean_profiles.csv

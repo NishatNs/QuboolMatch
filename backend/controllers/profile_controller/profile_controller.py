@@ -426,6 +426,8 @@ async def browse_users(
     try:
         print(f"[BROWSE] Starting browse_users endpoint (page={page}, limit={limit})...")
         # Get current user ID
+        if not authorization:
+            print("[BROWSE] Missing Authorization header")
         current_user_id = get_current_user_id(authorization, db)
         print(f"[BROWSE] Current user ID: {current_user_id}")
         
@@ -437,10 +439,12 @@ async def browse_users(
         offset = (page - 1) * limit
         
         # Get total count
+        total_users = db.query(User).count()
         total_count = db.query(User).filter(
             User.id != current_user_id,
             User.is_deleted == False
         ).count()
+        print(f"[BROWSE] Total users in DB: {total_users}")
         
         # Get paginated users
         users = db.query(User).filter(
@@ -448,10 +452,14 @@ async def browse_users(
             User.is_deleted == False
         ).offset(offset).limit(limit).all()
         print(f"[BROWSE] Found {len(users)} users on page {page} (total: {total_count})")
+        if users:
+            print(f"[BROWSE] First user on page: id={users[0].id} name={users[0].name}")
         
         result = []
         for user in users:
             profile = ProfileRepository.get_by_user_id(db, user.id)
+            if not profile:
+                print(f"[BROWSE] No profile found for user_id={user.id}")
             
             # Determine interest status with this user
             interest_status = "none"

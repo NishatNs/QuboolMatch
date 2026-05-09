@@ -1,0 +1,68 @@
+services:
+  db:
+    image: postgres:17-alpine
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-qubool}
+    ports:
+      - "5434:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d qubool"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - .env
+    environment:
+      ENV: prod
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/}
+      DATABASE_NAME: ${DATABASE_NAME:-qubool}
+      SECRET_KEY: ${SECRET_KEY:-change_me_local}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend-migrate:
+    build:
+      context: ./backend
+    env_file:
+      - .env
+    environment:
+      ENV: prod
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/}
+      DATABASE_NAME: ${DATABASE_NAME:-qubool}
+      SECRET_KEY: ${SECRET_KEY:-change_me_local}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    command: ["python", "migrate.py", "upgrade"]
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["tools"]
+
+volumes:
+  db_data:
