@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAccessToken } from '../services/api';
+import { getAccessToken, API_BASE_URL } from '../services/api';
 
 interface NIDImageDisplayProps {
   userId?: string; // If provided, shows image for specific user (admin view)
@@ -30,8 +30,8 @@ const NIDImageDisplay: React.FC<NIDImageDisplayProps> = ({
 
         // Determine endpoint based on whether userId is provided
         const endpoint = userId 
-          ? `http://localhost:8000/verification/image/${userId}`
-          : 'http://localhost:8000/verification/image';
+          ? `${API_BASE_URL}/verification/image/${userId}`
+          : `${API_BASE_URL}/verification/image`;
 
         const response = await fetch(endpoint, {
           headers: {

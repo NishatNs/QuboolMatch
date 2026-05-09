@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import { API_BASE_URL } from '../services/api';
 
 interface AdminContextType {
   isAdminLoggedIn: boolean;
@@ -36,7 +37,7 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
 
   const verifyAdminToken = async (token: string) => {
     try {
-      const response = await fetch('http://localhost:8000/admin/stats', {
+      const response = await fetch(`${API_BASE_URL}/admin/stats`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAccessToken } from '../services/api';
+import { getAccessToken, API_BASE_URL } from '../services/api';
 
 interface IntroVideoDisplayProps {
   userId?: string;
@@ -43,7 +43,7 @@ const IntroVideoDisplay: React.FC<IntroVideoDisplayProps> = ({
         }
 
         // Get current user ID from profile
-        const profileResponse = await fetch('http://localhost:8000/api/profile', {
+        const profileResponse = await fetch(`${API_BASE_URL}/api/profile`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -62,7 +62,7 @@ const IntroVideoDisplay: React.FC<IntroVideoDisplayProps> = ({
           return;
         }
 
-        const response = await fetch(`http://localhost:8000/api/profile/video/${actualUserId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/profile/video/${actualUserId}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }

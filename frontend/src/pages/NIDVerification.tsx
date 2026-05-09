@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import NIDImageDisplay from "../components/NIDImageDisplay";
 import RecentImageDisplay from "../components/RecentImageDisplay";
-import { getAccessToken } from "../services/api";
+import { getAccessToken, API_BASE_URL } from "../services/api";
 
 const NIDVerification: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -24,7 +24,7 @@ const NIDVerification: React.FC = () => {
         const token = getAccessToken();
         if (!token) return;
 
-        const response = await fetch("http://localhost:8000/verification/status", {
+        const response = await fetch(`${API_BASE_URL}/verification/status`, {
           headers: {
             "Authorization": `Bearer ${token}`
           }
@@ -115,7 +115,7 @@ const NIDVerification: React.FC = () => {
       }
 
       // Submit to API
-      const response = await fetch("http://localhost:8000/verification/submit", {
+      const response = await fetch(`${API_BASE_URL}/verification/submit`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`
@@ -134,7 +134,7 @@ const NIDVerification: React.FC = () => {
         // Set status to pending - waiting for admin verification
         setStatus("Verification Pending");
         // Refresh the status from server
-        const statusResponse = await fetch("http://localhost:8000/verification/status", {
+        const statusResponse = await fetch(`${API_BASE_URL}/verification/status`, {
           headers: {
             "Authorization": `Bearer ${token}`
           }

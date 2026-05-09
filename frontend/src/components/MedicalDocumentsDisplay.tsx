@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAccessToken } from '../services/api';
+import { getAccessToken, API_BASE_URL } from '../services/api';
 
 interface MedicalDocumentsDisplayProps {
   userId?: string;
@@ -45,7 +45,7 @@ const MedicalDocumentsDisplay: React.FC<MedicalDocumentsDisplayProps> = ({
         }
 
         // Get current user ID from profile
-        const profileResponse = await fetch('http://localhost:8000/api/profile', {
+        const profileResponse = await fetch(`${API_BASE_URL}/api/profile`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -64,7 +64,7 @@ const MedicalDocumentsDisplay: React.FC<MedicalDocumentsDisplayProps> = ({
           return;
         }
 
-        const response = await fetch(`http://localhost:8000/api/profile/documents/${actualUserId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/profile/documents/${actualUserId}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }

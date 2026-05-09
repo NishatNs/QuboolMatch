@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { getAccessToken } from "../services/api";
+import { getAccessToken, API_BASE_URL } from "../services/api";
 import IntroVideoDisplay from "../components/IntroVideoDisplay";
 import MedicalDocumentsDisplay from "../components/MedicalDocumentsDisplay";
 
@@ -325,7 +325,7 @@ const ProfilePage: React.FC = () => {
       };
 
       // Try to update first (if profile exists), otherwise create
-      let response = await fetch('http://localhost:8000/api/profile', {
+      let response = await fetch(`${API_BASE_URL}/api/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -336,7 +336,7 @@ const ProfilePage: React.FC = () => {
 
       // If update fails with 404, try creating new profile
       if (response.status === 404) {
-        response = await fetch('http://localhost:8000/api/profile', {
+        response = await fetch(`${API_BASE_URL}/api/profile`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -378,7 +378,7 @@ const ProfilePage: React.FC = () => {
           return; // User not logged in
         }
 
-        const response = await fetch('http://localhost:8000/api/profile', {
+        const response = await fetch(`${API_BASE_URL}/api/profile`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -396,7 +396,7 @@ const ProfilePage: React.FC = () => {
           let profilePictureData = '';
           if (data.has_profile_picture && data.user_id) {
             try {
-              const imgResponse = await fetch(`http://localhost:8000/api/profile/picture/${data.user_id}`);
+              const imgResponse = await fetch(`${API_BASE_URL}/api/profile/picture/${data.user_id}`);
               if (imgResponse.ok) {
                 const blob = await imgResponse.blob();
                 profilePictureData = await new Promise((resolve) => {

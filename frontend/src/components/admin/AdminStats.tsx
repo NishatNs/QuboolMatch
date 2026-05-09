@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../../services/api';
 
 interface AdminStatsData {
   total_users: number;
@@ -21,7 +22,7 @@ const AdminStats: React.FC = () => {
   const fetchStats = async () => {
     try {
       const token = localStorage.getItem('adminAccessToken');
-      const response = await fetch('http://localhost:8000/admin/stats', {
+      const response = await fetch(`${API_BASE_URL}/admin/stats`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

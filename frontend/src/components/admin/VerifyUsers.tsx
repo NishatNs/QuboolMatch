@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../../services/api';
 
 interface PendingUser {
   id: string;
@@ -33,7 +34,7 @@ const VerifyUsers: React.FC = () => {
   const fetchPendingUsers = async () => {
     try {
       const token = localStorage.getItem('adminAccessToken');
-      const response = await fetch('http://localhost:8000/verification/pending', {
+      const response = await fetch(`${API_BASE_URL}/verification/pending`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -65,7 +66,7 @@ const VerifyUsers: React.FC = () => {
     setProcessingUserId(userId);
     try {
       const token = localStorage.getItem('adminAccessToken');
-      const response = await fetch(`http://localhost:8000/verification/approve/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/verification/approve/${userId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -99,7 +100,7 @@ const VerifyUsers: React.FC = () => {
       const formData = new FormData();
       formData.append('rejection_notes', rejectionNotes);
 
-      const response = await fetch(`http://localhost:8000/verification/reject/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/verification/reject/${userId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -126,7 +127,7 @@ const VerifyUsers: React.FC = () => {
   const viewNIDImage = async (userId: string) => {
     try {
       const token = localStorage.getItem('adminAccessToken');
-      const response = await fetch(`http://localhost:8000/verification/image/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/verification/image/${userId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -149,7 +150,7 @@ const VerifyUsers: React.FC = () => {
   const viewRecentImage = async (userId: string) => {
     try {
       const token = localStorage.getItem('adminAccessToken');
-      const response = await fetch(`http://localhost:8000/verification/recent-image/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/verification/recent-image/${userId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -173,7 +174,7 @@ const VerifyUsers: React.FC = () => {
     setMatchingUserId(userId);
     try {
       const token = localStorage.getItem('adminAccessToken');
-      const response = await fetch(`http://localhost:8000/verification/match-images/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/verification/match-images/${userId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

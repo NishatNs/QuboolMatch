@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { API_BASE_URL } from "../services/api";
 import { Button, Input, Card } from "../components/ui";
 
 const SignIn: React.FC = () => {
@@ -19,7 +20,7 @@ const SignIn: React.FC = () => {
 
     try {
       // Call backend API for sign in
-      const response = await fetch("http://localhost:8000/auth/sign_in", {
+      const response = await fetch(`${API_BASE_URL}/auth/sign_in`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
