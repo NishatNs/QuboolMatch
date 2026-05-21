@@ -5,6 +5,7 @@ interface PendingUser {
   id: string;
   email: string;
   verification_status: string;
+  guardian_verification_status: string;
   verification_date: string | null;
   verification_time: string | null;
   has_nid_image: boolean;
@@ -26,6 +27,7 @@ const VerifyUsers: React.FC = () => {
   const [error, setError] = useState('');
   const [processingUserId, setProcessingUserId] = useState<string | null>(null);
   const [matchingUserId, setMatchingUserId] = useState<string | null>(null);
+  const [guardianProcessingUserId, setGuardianProcessingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPendingUsers();
@@ -121,6 +123,62 @@ const VerifyUsers: React.FC = () => {
       alert(error instanceof Error ? error.message : 'Failed to reject user');
     } finally {
       setProcessingUserId(null);
+    }
+  };
+
+  const handleGuardianApprove = async (userId: string) => {
+    setGuardianProcessingUserId(userId);
+    try {
+      const token = localStorage.getItem('adminAccessToken');
+      const response = await fetch(`${API_BASE_URL}/verification/guardian/approve/${userId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to approve guardian verification');
+      }
+
+      setPendingUsers(prev => prev.map(user =>
+        user.id === userId ? { ...user, guardian_verification_status: 'verified' } : user
+      ));
+
+      alert('Guardian verification approved!');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to approve guardian verification');
+    } finally {
+      setGuardianProcessingUserId(null);
+    }
+  };
+
+  const handleGuardianReject = async (userId: string) => {
+    setGuardianProcessingUserId(userId);
+    try {
+      const token = localStorage.getItem('adminAccessToken');
+      const response = await fetch(`${API_BASE_URL}/verification/guardian/reject/${userId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to reject guardian verification');
+      }
+
+      setPendingUsers(prev => prev.map(user =>
+        user.id === userId ? { ...user, guardian_verification_status: 'rejected' } : user
+      ));
+
+      alert('Guardian verification rejected!');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to reject guardian verification');
+    } finally {
+      setGuardianProcessingUserId(null);
     }
   };
 
@@ -260,8 +318,8 @@ const VerifyUsers: React.FC = () => {
           <p className="text-gray-600">No pending verifications at the moment.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div className="bg-white rounded-lg shadow overflow-x-auto">
+          <table className="min-w-[1100px] divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -281,6 +339,9 @@ const VerifyUsers: React.FC = () => {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Match
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Guardian Verified
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
@@ -359,6 +420,35 @@ const VerifyUsers: React.FC = () => {
                           {user.matching_percentage.toFixed(1)}%
                         </span>
                       )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center space-x-2">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        user.guardian_verification_status === 'verified'
+                          ? 'bg-green-100 text-green-800'
+                          : user.guardian_verification_status === 'rejected'
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {user.guardian_verification_status || 'pending'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleGuardianApprove(user.id)}
+                        disabled={guardianProcessingUserId === user.id || user.guardian_verification_status === 'verified'}
+                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {guardianProcessingUserId === user.id ? 'Processing...' : 'Yes'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleGuardianReject(user.id)}
+                        disabled={guardianProcessingUserId === user.id || user.guardian_verification_status === 'rejected'}
+                        className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {guardianProcessingUserId === user.id ? 'Processing...' : 'No'}
+                      </button>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">

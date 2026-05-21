@@ -17,6 +17,10 @@ interface ProfileData {
   age: string;
   gender: string;
   location: string;
+  guardianName: string;
+  guardianRelation: string;
+  guardianRelationOther: string;
+  guardianContactNumber: string;
   academicBackground: string;
   profession: string;
   maritalStatus: string;
@@ -82,6 +86,10 @@ const ProfilePage: React.FC = () => {
     age: "",
     gender: "",
     location: "",
+    guardianName: "",
+    guardianRelation: "",
+    guardianRelationOther: "",
+    guardianContactNumber: "",
     academicBackground: "",
     profession: "",
     maritalStatus: "",
@@ -138,9 +146,19 @@ const ProfilePage: React.FC = () => {
     additionalComments: ""
   });
 
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement> | { target: { name: string; value: any; type?: string; checked?: boolean } }) => {
     const { name, value, type } = e.target as HTMLInputElement & { type?: string };
     const checked = (e.target as HTMLInputElement).checked;
+
+    if (name === 'guardianRelation') {
+      setProfile((prev) => ({
+        ...prev,
+        guardianRelation: value,
+        guardianRelationOther: value === 'Other' ? prev.guardianRelationOther : ''
+      }));
+      return;
+    }
     
     // Handle genetic condition checkboxes
     if (name === 'geneticConditions' && Array.isArray(value)) {
@@ -279,6 +297,10 @@ const ProfilePage: React.FC = () => {
       // Transform the frontend profile data to match the backend API format
       const profileData = {
         location: profile.location,
+        guardian_name: profile.guardianName,
+        guardian_relation: profile.guardianRelation,
+        guardian_relation_other: profile.guardianRelationOther,
+        guardian_contact_number: profile.guardianContactNumber,
         academic_background: profile.academicBackground,
         profession: profile.profession,
         marital_status: profile.maritalStatus,
@@ -416,6 +438,10 @@ const ProfilePage: React.FC = () => {
             age: data.age || '',
             gender: data.gender || '',
             location: data.location || '',
+            guardianName: data.guardian_name || '',
+            guardianRelation: data.guardian_relation || '',
+            guardianRelationOther: data.guardian_relation_other || '',
+            guardianContactNumber: data.guardian_contact_number || '',
             academicBackground: data.academic_background || '',
             profession: data.profession || '',
             maritalStatus: data.marital_status || '',
@@ -578,6 +604,59 @@ const ProfileHeader: React.FC<{
               <option value="Female">Female</option>
               <option value="Other">Other</option>
             </select>
+          </div>
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700">Guardian's Name</label>
+            <input
+              type="text"
+              name="guardianName"
+              value={profile.guardianName}
+              onChange={onInputChange}
+              className="bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 w-full"
+              placeholder="Enter guardian's name"
+            />
+          </div>
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700">Relation with the User</label>
+            <select
+              name="guardianRelation"
+              value={profile.guardianRelation}
+              onChange={onInputChange}
+              className="bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 w-full"
+            >
+              <option value="">Select Relation</option>
+              <option value="Father">Father</option>
+              <option value="Mother">Mother</option>
+              <option value="Sibling">Sibling</option>
+              <option value="Uncle">Uncle</option>
+              <option value="Aunt">Aunt</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          {profile.guardianRelation === "Other" && (
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700">Relation Details (Optional)</label>
+              <input
+                type="text"
+                name="guardianRelationOther"
+                value={profile.guardianRelationOther}
+                onChange={onInputChange}
+                className="bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 w-full"
+                placeholder="Specify relation"
+              />
+            </div>
+          )}
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700">Guardian Contact Number</label>
+            <input
+              type="tel"
+              name="guardianContactNumber"
+              value={profile.guardianContactNumber}
+              onChange={onInputChange}
+              required
+              className="bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 w-full"
+              placeholder="Enter guardian contact number"
+            />
           </div>
           <div className="mt-4">
             <label className="block text-sm font-medium text-gray-700">Address</label>

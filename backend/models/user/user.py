@@ -47,6 +47,8 @@ class User(Base):
     verified_at = Column(DateTime, nullable=True)  # When verification was completed
     matching_percentage = Column(Float, nullable=True)  # AI-based face matching percentage (0-100)
 
+    guardian_verification_status = Column(String, default="not_submitted", nullable=False)
+
     def __init__(self, name: str, email: str, password: str, gender: str, nid: str, age: int, 
                  religion: str = None, preferred_age_from: int = None, preferred_age_to: int = None, 
                  is_admin: bool = False):
@@ -64,6 +66,7 @@ class User(Base):
         self.is_deleted = False
         self.is_archived = False
         self.verification_status = "not_submitted"
+        self.guardian_verification_status = "not_submitted"
 
     def check_password(self, password: str) -> bool:
         return bcrypt.checkpw(password.encode(), self.hashed_password.encode())
@@ -115,6 +118,14 @@ class User(Base):
         self.verification_status = "rejected"
         if notes:
             self.verification_notes = notes
+        return self
+
+    def verify_guardian(self):
+        self.guardian_verification_status = "verified"
+        return self
+
+    def reject_guardian_verification(self):
+        self.guardian_verification_status = "rejected"
         return self
 
     def promote_to_admin(self):

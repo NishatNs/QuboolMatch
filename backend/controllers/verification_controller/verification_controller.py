@@ -257,6 +257,42 @@ async def reject_verification(
     
     return {"success": True, "message": "User verification rejected"}
 
+@router.post("/guardian/approve/{user_id}")
+async def approve_guardian_verification(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """
+    Admin endpoint to approve guardian verification
+    """
+    user = db.query(User).filter(User.id == user_id, User.is_deleted == False).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.verify_guardian()
+    db.commit()
+
+    return {"success": True, "message": "Guardian verification approved"}
+
+@router.post("/guardian/reject/{user_id}")
+async def reject_guardian_verification(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """
+    Admin endpoint to reject guardian verification
+    """
+    user = db.query(User).filter(User.id == user_id, User.is_deleted == False).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.reject_guardian_verification()
+    db.commit()
+
+    return {"success": True, "message": "Guardian verification rejected"}
+
 @router.get("/pending")
 async def get_pending_verifications(
     db: Session = Depends(get_db),
@@ -284,7 +320,8 @@ async def get_pending_verifications(
                 "recent_image_filename": user.recent_image_filename,
                 "verification_notes": user.verification_notes,
                 "created_at": user.created_at.isoformat(),
-                "matching_percentage": user.matching_percentage
+                "matching_percentage": user.matching_percentage,
+                "guardian_verification_status": user.guardian_verification_status
             }
             for user in pending_users
         ]

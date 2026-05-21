@@ -87,6 +87,10 @@ def process_base64_file(base64_data: str) -> tuple:
 class ProfileCreate(BaseModel):
     # Personal Information
     location: Optional[str] = None
+    guardian_name: Optional[str] = None
+    guardian_relation: Optional[str] = None
+    guardian_relation_other: Optional[str] = None
+    guardian_contact_number: Optional[str] = None
     academic_background: Optional[str] = None
     profession: Optional[str] = None
     marital_status: Optional[str] = None

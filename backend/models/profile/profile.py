@@ -13,6 +13,10 @@ class Profile(Base):
     
     # Personal Information
     location = Column(String, nullable=True)
+    guardian_name = Column(String, nullable=True)
+    guardian_relation = Column(String, nullable=True)
+    guardian_relation_other = Column(String, nullable=True)
+    guardian_contact_number = Column(String, nullable=True)
     academic_background = Column(String, nullable=True)
     profession = Column(String, nullable=True)
     marital_status = Column(String, nullable=True)
@@ -129,6 +133,10 @@ class Profile(Base):
             'id': self.id,
             'user_id': self.user_id,
             'location': self.location,
+            'guardian_name': self.guardian_name,
+            'guardian_relation': self.guardian_relation,
+            'guardian_relation_other': self.guardian_relation_other,
+            'guardian_contact_number': self.guardian_contact_number,
             'academic_background': self.academic_background,
             'profession': self.profession,
             'marital_status': self.marital_status,
