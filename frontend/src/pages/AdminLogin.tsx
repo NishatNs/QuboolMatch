@@ -126,13 +126,6 @@ const AdminLogin: React.FC = () => {
             </div>
           </div>
 
-          {/* Development helper */}
-          <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-            <h4 className="text-sm font-medium text-yellow-800">Development Login</h4>
-            <p className="text-xs text-yellow-700 mt-1">
-              Default admin: admin@quboolmatch.com / admin123
-            </p>
-          </div>
         </div>
       </div>
     </div>
