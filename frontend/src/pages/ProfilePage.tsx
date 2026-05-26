@@ -296,6 +296,10 @@ const ProfilePage: React.FC = () => {
 
       // Transform the frontend profile data to match the backend API format
       const profileData = {
+        name: profile.name,
+        age: profile.age ? parseInt(profile.age) : null,
+        gender: profile.gender,
+        religion: profile.religion,
         location: profile.location,
         guardian_name: profile.guardianName,
         guardian_relation: profile.guardianRelation,
