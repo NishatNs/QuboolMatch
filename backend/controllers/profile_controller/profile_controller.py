@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from database import get_db
 from repositories.profile_repository.profile_repository import ProfileRepository
+from repositories.block_repository import BlockRepository
 from shared.token import Token
 from models.user.user import User
 import json
@@ -512,17 +513,26 @@ async def browse_users(
         
         # Get total count
         total_users = db.query(User).count()
-        total_count = db.query(User).filter(
+        blocked_ids = BlockRepository.get_blocked_user_ids(db, current_user_id)
+        total_query = db.query(User).filter(
             User.id != current_user_id,
             User.is_deleted == False
-        ).count()
+        )
+        if blocked_ids:
+            total_query = total_query.filter(User.id.notin_(blocked_ids))
+
+        total_count = total_query.count()
         print(f"[BROWSE] Total users in DB: {total_users}")
         
         # Get paginated users
-        users = db.query(User).filter(
+        users_query = db.query(User).filter(
             User.id != current_user_id,
             User.is_deleted == False
-        ).offset(offset).limit(limit).all()
+        )
+        if blocked_ids:
+            users_query = users_query.filter(User.id.notin_(blocked_ids))
+
+        users = users_query.offset(offset).limit(limit).all()
         print(f"[BROWSE] Found {len(users)} users on page {page} (total: {total_count})")
         if users:
             print(f"[BROWSE] First user on page: id={users[0].id} name={users[0].name}")
@@ -564,6 +574,9 @@ async def browse_users(
                 except Exception as e:
                     print(f"Error encoding profile picture: {e}")
             
+            nid_verified = user.verification_status == "verified"
+            photo_verified = user.matching_percentage is not None and user.matching_percentage >= 70
+
             # Build brief profile with overview fields
             user_brief = {
                 "id": user.id,
@@ -576,6 +589,10 @@ async def browse_users(
                 "academic_background": profile.academic_background if profile else None,
                 "profile_picture": profile_picture_base64,
                 "interest_status": interest_status,
+                "verification_status": user.verification_status,
+                "matching_percentage": user.matching_percentage,
+                "nid_verified": nid_verified,
+                "photo_verified": photo_verified,
                 # Additional overview fields
                 "marital_status": profile.marital_status if profile else None,
                 "height": profile.height if profile else None,
@@ -633,6 +650,7 @@ async def get_recommendations(
 
         from repositories.interest_repository.interest_repository import InterestRepository
         from services.recommendation_service import get_recommendations as ml_recommend, is_ready
+        blocked_ids = BlockRepository.get_blocked_user_ids(db, current_user_id)
 
         print("[RECOMMENDATIONS] Checking if ML model is ready...")
         ml_ready = is_ready()
@@ -647,12 +665,18 @@ async def get_recommendations(
                 print("[RECOMMENDATIONS] Model ready but returned no ranked users, falling back to all users")
             else:
                 print("[RECOMMENDATIONS] ML not ready, falling back to all users")
-            users = db.query(User).filter(
+            users_query = db.query(User).filter(
                 User.id != current_user_id,
                 User.is_deleted == False
-            ).all()
+            )
+            if blocked_ids:
+                users_query = users_query.filter(User.id.notin_(blocked_ids))
+            users = users_query.all()
             ranked_ids = [u.id for u in users]
             print(f"[RECOMMENDATIONS] Fallback found {len(ranked_ids)} users")
+
+        if blocked_ids:
+            ranked_ids = [uid for uid in ranked_ids if uid not in blocked_ids]
 
         # Apply pagination to ranked_ids
         total_count = len(ranked_ids)
@@ -696,6 +720,9 @@ async def get_recommendations(
                 except Exception as e:
                     print(f"Error encoding profile picture: {e}")
 
+            nid_verified = user.verification_status == "verified"
+            photo_verified = user.matching_percentage is not None and user.matching_percentage >= 70
+
             result.append({
                 "id": user.id,
                 "name": user.name,
@@ -707,6 +734,10 @@ async def get_recommendations(
                 "academic_background": profile.academic_background if profile else None,
                 "profile_picture": profile_picture_base64,
                 "interest_status": interest_status,
+                "verification_status": user.verification_status,
+                "matching_percentage": user.matching_percentage,
+                "nid_verified": nid_verified,
+                "photo_verified": photo_verified,
                 # Additional overview fields
                 "marital_status": profile.marital_status if profile else None,
                 "height": profile.height if profile else None,
@@ -764,6 +795,9 @@ async def get_full_profile(
         # Import here to avoid circular import
         from repositories.interest_repository.interest_repository import InterestRepository
         
+        if BlockRepository.is_blocked_between(db, current_user_id, user_id):
+            raise HTTPException(status_code=403, detail="You cannot view this profile")
+
         # Check if mutual interest exists
         has_mutual_interest = InterestRepository.check_mutual_interest(db, current_user_id, user_id)
         
@@ -782,6 +816,9 @@ async def get_full_profile(
         if not profile:
             raise HTTPException(status_code=404, detail="Profile not found")
         
+        nid_verified = user.verification_status == "verified"
+        photo_verified = user.matching_percentage is not None and user.matching_percentage >= 70
+
         # Return full profile with all details
         full_profile = {
             "id": user.id,
@@ -791,6 +828,10 @@ async def get_full_profile(
             "gender": user.gender,
             "religion": user.religion,
             "nid": user.nid,
+            "verification_status": user.verification_status,
+            "matching_percentage": user.matching_percentage,
+            "nid_verified": nid_verified,
+            "photo_verified": photo_verified,
             "profile": profile.to_dict()
         }
         

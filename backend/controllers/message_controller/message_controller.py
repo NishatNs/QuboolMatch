@@ -13,6 +13,7 @@ from repositories.interest_repository.interest_repository import InterestReposit
 from repositories.message_repository.message_repository import MessageRepository
 from repositories.notification_repository.notification_repository import NotificationRepository
 from repositories.user_repository.user_repository import UserRepository
+from repositories.block_repository import BlockRepository
 from shared.token import Token, get_current_user
 from google import genai
 from google.genai import types
@@ -237,7 +238,7 @@ def _moderate_message(content: str) -> Dict[str, str | bool]:
     }
 
 
-def _validate_chat_allowed(db: Session, current_user_id: str, other_user_id: str):
+def _validate_thread_allowed(db: Session, current_user_id: str, other_user_id: str):
     if current_user_id == other_user_id:
         raise HTTPException(status_code=400, detail="You cannot chat with yourself")
 
@@ -247,6 +248,16 @@ def _validate_chat_allowed(db: Session, current_user_id: str, other_user_id: str
 
     if not InterestRepository.check_accepted_interest_between(db, current_user_id, other_user_id):
         raise HTTPException(status_code=403, detail="Chat is allowed only after an accepted interest request")
+
+
+def _validate_send_allowed(db: Session, current_user_id: str, other_user_id: str):
+    _validate_thread_allowed(db, current_user_id, other_user_id)
+
+    if BlockRepository.has_blocked(db, current_user_id, other_user_id):
+        raise HTTPException(status_code=403, detail="Unblock this user before sending messages")
+
+    if BlockRepository.has_blocked(db, other_user_id, current_user_id):
+        raise HTTPException(status_code=403, detail="This user is not available anymore")
 
 
 @router.post("/messages/send")
@@ -261,7 +272,7 @@ async def send_message(
     if len(content) > 1000:
         raise HTTPException(status_code=400, detail="Message is too long (max 1000 characters)")
 
-    _validate_chat_allowed(db, current_user.id, params.to_user_id)
+    _validate_send_allowed(db, current_user.id, params.to_user_id)
 
     normalized = _normalize_for_filter(content)
     if _has_term(normalized, BLOCKLIST) or _has_phrase(normalized, BAD_PHRASES):
@@ -338,7 +349,7 @@ async def get_thread(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _validate_chat_allowed(db, current_user.id, other_user_id)
+    _validate_thread_allowed(db, current_user.id, other_user_id)
 
     messages = MessageRepository.get_thread(db, current_user.id, other_user_id, limit=limit)
     return JSONResponse(content={"messages": [m.to_dict() for m in messages]}, status_code=200)
@@ -350,7 +361,7 @@ async def mark_thread_as_read(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _validate_chat_allowed(db, current_user.id, other_user_id)
+    _validate_thread_allowed(db, current_user.id, other_user_id)
 
     updated_count = MessageRepository.mark_thread_as_read(db, current_user.id, other_user_id)
     return JSONResponse(content={"updated_count": updated_count}, status_code=200)

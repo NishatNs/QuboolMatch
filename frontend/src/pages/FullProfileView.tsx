@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { interestApi } from "../services/api";
+import { interestApi, trustSafetyApi } from "../services/api";
 
 interface FullProfileResponse {
   id: string;
@@ -10,6 +10,10 @@ interface FullProfileResponse {
   gender: string;
   religion: string | null;
   nid: string;
+  verification_status?: string | null;
+  matching_percentage?: number | null;
+  nid_verified?: boolean;
+  photo_verified?: boolean;
   profile: {
     location?: string | null;
     profession?: string | null;
@@ -62,6 +66,58 @@ const FullProfileView: React.FC = () => {
     void loadProfile();
   }, [userId]);
 
+  const renderVerificationBadges = (data: FullProfileResponse) => {
+    if (!data.nid_verified && !data.photo_verified) {
+      return null;
+    }
+
+    return (
+      <div className="flex flex-wrap gap-2 mt-2">
+        {data.nid_verified && (
+          <span
+            className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 text-xs font-medium px-2 py-0.5"
+            title="NID verified by our team"
+          >
+            NID Verified
+          </span>
+        )}
+        {data.photo_verified && (
+          <span
+            className="inline-flex items-center rounded-full bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5"
+            title="Photo verified via NID-to-photo match"
+          >
+            Photo Verified
+          </span>
+        )}
+      </div>
+    );
+  };
+
+  const handleReport = async () => {
+    if (!profile) return;
+    const reason = window.prompt('Why are you reporting this user? (e.g., harassment, scam, spam)');
+    if (!reason || !reason.trim()) return;
+    const details = window.prompt('Any additional details? (optional)');
+    try {
+      await trustSafetyApi.reportUser(profile.id, reason.trim(), details?.trim() || undefined, 'full_profile');
+      alert('Report submitted. Thank you for helping keep the community safe.');
+    } catch (err: any) {
+      alert(err?.message || 'Failed to submit report');
+    }
+  };
+
+  const handleBlock = async () => {
+    if (!profile) return;
+    if (!window.confirm(`Block ${profile.name}? You will no longer see each other.`)) return;
+    try {
+      await trustSafetyApi.blockUser(profile.id);
+      alert(`${profile.name} has been blocked.`);
+      navigate(-1);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to block user');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 py-8">
       <div className="container mx-auto px-4 max-w-4xl">
@@ -70,13 +126,28 @@ const FullProfileView: React.FC = () => {
             <div>
               <h1 className="text-3xl font-bold text-gray-800">Full Profile</h1>
               <p className="text-sm text-gray-500">Read-only view for matched users</p>
+              {profile && renderVerificationBadges(profile)}
             </div>
-            <button
-              onClick={() => navigate(-1)}
-              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md"
-            >
-              Back
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleReport}
+                className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm"
+              >
+                Report
+              </button>
+              <button
+                onClick={handleBlock}
+                className="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-md text-sm"
+              >
+                Block
+              </button>
+              <button
+                onClick={() => navigate(-1)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md"
+              >
+                Back
+              </button>
+            </div>
           </div>
 
           {loading ? (

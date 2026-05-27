@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { interestApi } from "../services/api";
+import { interestApi, trustSafetyApi } from "../services/api";
 import { useNavigate } from "react-router-dom";
 
 // Define the structure for a user from the API
@@ -14,6 +14,10 @@ interface User {
   academic_background: string | null;
   profile_picture: string | null;
   interest_status: 'none' | 'pending_sent' | 'pending_received' | 'accepted' | 'rejected';
+  verification_status?: string | null;
+  matching_percentage?: number | null;
+  nid_verified?: boolean;
+  photo_verified?: boolean;
   // Overview fields
   marital_status?: string | null;
   height?: number | null;
@@ -41,6 +45,10 @@ interface MatchResponse {
     age: number;
     religion: string | null;
     profile_picture: string | null;
+    verification_status?: string | null;
+    matching_percentage?: number | null;
+    nid_verified?: boolean;
+    photo_verified?: boolean;
   };
 }
 
@@ -122,6 +130,10 @@ const FindMatches: React.FC = () => {
           academic_background: null,
           profile_picture: match.matched_user.profile_picture,
           interest_status: 'accepted' as const,
+          verification_status: match.matched_user.verification_status,
+          matching_percentage: match.matched_user.matching_percentage,
+          nid_verified: match.matched_user.nid_verified,
+          photo_verified: match.matched_user.photo_verified,
         }));
         setUsers(newUsers);
         setFilteredUsers(newUsers);
@@ -237,6 +249,66 @@ const FindMatches: React.FC = () => {
 
   const isButtonDisabled = (status: string, userId: string) => {
     return status === 'pending_sent' || status === 'accepted' || status === 'rejected' || sendingInterest === userId;
+  };
+
+  const renderVerificationBadges = (user: User) => {
+    if (!user.nid_verified && !user.photo_verified) {
+      return null;
+    }
+
+    return (
+      <div className="flex flex-wrap gap-2 mt-2">
+        {user.nid_verified && (
+          <span
+            className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 text-xs font-medium px-2 py-0.5"
+            title="NID verified by our team"
+          >
+            NID Verified
+          </span>
+        )}
+        {user.photo_verified && (
+          <span
+            className="inline-flex items-center rounded-full bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5"
+            title="Photo verified via NID-to-photo match"
+          >
+            Photo Verified
+          </span>
+        )}
+      </div>
+    );
+  };
+
+  const handleReportUser = async (user: User) => {
+    const reason = window.prompt('Why are you reporting this user? (e.g., harassment, scam, spam)');
+    if (!reason || !reason.trim()) {
+      return;
+    }
+
+    const details = window.prompt('Any additional details? (optional)');
+    try {
+      await trustSafetyApi.reportUser(user.id, reason.trim(), details?.trim() || undefined, 'matches');
+      alert('Report submitted. Thank you for helping keep the community safe.');
+    } catch (err: any) {
+      alert(err?.message || 'Failed to submit report');
+    }
+  };
+
+  const handleBlockUser = async (user: User) => {
+    if (!window.confirm(`Block ${user.name}? You will no longer see each other.`)) {
+      return;
+    }
+
+    try {
+      await trustSafetyApi.blockUser(user.id);
+      setUsers((prev) => prev.filter((item) => item.id !== user.id));
+      setFilteredUsers((prev) => prev.filter((item) => item.id !== user.id));
+      if (selectedUser?.id === user.id) {
+        setSelectedUser(null);
+      }
+      alert(`${user.name} has been blocked.`);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to block user');
+    }
   };
 
   return (
@@ -492,6 +564,7 @@ const FindMatches: React.FC = () => {
                     {/* Profile Details */}
                     <div className="p-5">
                       <h3 className="text-xl font-bold text-gray-800">{user.name}, {user.age}</h3>
+                      {renderVerificationBadges(user)}
                       
                       <div className="mt-2 text-sm text-gray-600 space-y-1">
                         {user.location && (
@@ -658,16 +731,31 @@ const FindMatches: React.FC = () => {
                   <div>
                     <h2 className="text-2xl font-bold">{selectedUser.name}, {selectedUser.age}</h2>
                     <p className="text-pink-100">{selectedUser.gender}</p>
+                    {renderVerificationBadges(selectedUser)}
                   </div>
                 </div>
-                <button 
-                  onClick={() => setSelectedUser(null)}
-                  className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleReportUser(selectedUser)}
+                    className="px-3 py-1.5 text-xs font-medium bg-white/20 hover:bg-white/30 rounded-full"
+                  >
+                    Report
+                  </button>
+                  <button
+                    onClick={() => handleBlockUser(selectedUser)}
+                    className="px-3 py-1.5 text-xs font-medium bg-white/20 hover:bg-white/30 rounded-full"
+                  >
+                    Block
+                  </button>
+                  <button 
+                    onClick={() => setSelectedUser(null)}
+                    className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
 
