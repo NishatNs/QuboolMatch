@@ -518,6 +518,7 @@ const FindMatches: React.FC = () => {
             )
           ) : filteredUsers.length > 0 ? (
             <>
+              <p className="text-gray-600 mb-4">Showing {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''}</p>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[70vh] overflow-y-auto p-2">
                 {filteredUsers.map((user) => (
                   <div key={user.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300">
