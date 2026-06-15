@@ -1668,6 +1668,19 @@ const PartnerPreferencesSection: React.FC<{
             <option value="flexible">Flexible based on situation</option>
           </select>
         </div>
+        <div className="mt-3">
+          <label className="block text-sm font-medium text-gray-700">
+            Anything else you want to mention
+          </label>
+          <textarea
+            name="additionalComments"
+            value={profile.additionalComments}
+            onChange={onInputChange}
+            className="mt-1 w-full rounded-md border border-gray-300 p-2 focus:border-indigo-600 focus:outline-none"
+            placeholder="Anything else you want to mention"
+            rows={3}
+          />
+        </div>
       </div>
       
       {/* Must-Have Preferences */}
@@ -1750,18 +1763,6 @@ const PartnerPreferencesSection: React.FC<{
         </div>
       </div>
       
-      {/* Additional Comments */}
-      <div className="mb-3">
-        <h3 className="text-lg font-semibold text-gray-700 mb-2">Additional Comments</h3>
-        <textarea
-          name="additionalComments"
-          value={profile.additionalComments}
-          onChange={onInputChange}
-          className="mt-1 w-full rounded-md border border-gray-300 p-2 focus:border-indigo-600 focus:outline-none"
-          placeholder="Any other preferences or expectations you'd like to mention"
-          rows={3}
-        />
-      </div>
     </div>
   );
 };
