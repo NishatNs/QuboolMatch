@@ -69,6 +69,7 @@ interface ProfileData {
   willingToRelocate: boolean;
   lifestylePreferences: LifestylePreferences;
   livingWithInLaws: string;
+  livingArrangementComment: string;
   careerSupportExpectations: string;
   necessaryPreferences: string[];
   additionalComments: string;
@@ -88,6 +89,45 @@ interface CompletionResult {
     preferences: CompletionSection;
   };
 }
+
+const parseAdditionalComments = (value: string | null | undefined) => {
+  let generalComment = "";
+  let livingArrangementComment = "";
+
+  if (!value) {
+    return { generalComment, livingArrangementComment };
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      if (typeof parsed.generalComment === "string") {
+        generalComment = parsed.generalComment;
+      } else if (typeof parsed.general === "string") {
+        generalComment = parsed.general;
+      } else if (typeof parsed.comment === "string") {
+        generalComment = parsed.comment;
+      }
+
+      if (typeof parsed.livingArrangementComment === "string") {
+        livingArrangementComment = parsed.livingArrangementComment;
+      }
+
+      return { generalComment, livingArrangementComment };
+    }
+
+    if (typeof parsed === "string") {
+      generalComment = parsed;
+      return { generalComment, livingArrangementComment };
+    }
+  } catch {
+    // Backward compatibility with legacy plain-text comments.
+  }
+
+  generalComment = value;
+  return { generalComment, livingArrangementComment };
+};
 
 const isFilled = (value: unknown): boolean => {
   if (value === null || value === undefined) return false;
@@ -224,6 +264,7 @@ const ProfilePage: React.FC = () => {
       dietaryMatch: false
     },
     livingWithInLaws: "",
+    livingArrangementComment: "",
     careerSupportExpectations: "",
     necessaryPreferences: [],
     additionalComments: ""
@@ -432,9 +473,13 @@ const ProfilePage: React.FC = () => {
         lifestyle_pref_alcohol: profile.lifestylePreferences.alcohol,
         lifestyle_pref_dietary_match: profile.lifestylePreferences.dietaryMatch,
         living_with_in_laws: profile.livingWithInLaws,
+        living_arrangement_comment: profile.livingArrangementComment,
         career_support_expectations: profile.careerSupportExpectations,
         necessary_preferences: JSON.stringify(profile.necessaryPreferences),
-        additional_comments: profile.additionalComments,
+        additional_comments: JSON.stringify({
+          generalComment: profile.additionalComments,
+          livingArrangementComment: profile.livingArrangementComment
+        }),
         is_completed: true
       };
 
@@ -525,6 +570,7 @@ const ProfilePage: React.FC = () => {
           }
           
           // Transform backend data to frontend format
+          const parsedAdditionalComments = parseAdditionalComments(data.additional_comments || '');
           setProfile({
             name: data.name || '',
             age: data.age || '',
@@ -576,9 +622,10 @@ const ProfilePage: React.FC = () => {
               dietaryMatch: data.lifestyle_pref_dietary_match || false
             },
             livingWithInLaws: data.living_with_in_laws || '',
+            livingArrangementComment: data.living_arrangement_comment || parsedAdditionalComments.livingArrangementComment || '',
             careerSupportExpectations: data.career_support_expectations || '',
             necessaryPreferences: data.necessary_preferences ? JSON.parse(data.necessary_preferences) : [],
-            additionalComments: data.additional_comments || ''
+            additionalComments: parsedAdditionalComments.generalComment
           });
         }
       } catch (error) {
@@ -1193,6 +1240,19 @@ const PersonalInfoSection: React.FC<{
               </select>
               <p className="mt-1 text-xs text-gray-500">This information is sensitive and optional. You can choose to keep it private or discuss with potential matches later.</p>
             </div>
+            <div className="mt-3">
+          <label className="block text-sm font-medium text-gray-700">
+            
+          </label>
+          <textarea
+            name="additionalComments"
+            value={profile.additionalComments}
+            onChange={onInputChange}
+            className="mt-1 w-full rounded-md border border-gray-300 p-2 focus:border-indigo-600 focus:outline-none"
+            placeholder="Anything else you want to mention"
+            rows={3}
+          />
+        </div>
             
             {/* Disability or Special Needs */}
             <div className="mb-4">
@@ -1512,6 +1572,19 @@ const PartnerPreferencesSection: React.FC<{
           <option value="other">Other</option>
         </select>
       </div>
+      <div className="mt-3">
+          <label className="block text-sm font-medium text-gray-700">
+           
+          </label>
+          <textarea
+            name="additionalComments"
+            value={profile.additionalComments}
+            onChange={onInputChange}
+            className="mt-1 w-full rounded-md border border-gray-300 p-2 focus:border-indigo-600 focus:outline-none"
+            placeholder="Anything else you want to mention"
+            rows={3}
+          />
+        </div>  
       
       {/* Educational & Professional Preferences */}
       <div className="mb-5">
@@ -1531,6 +1604,19 @@ const PartnerPreferencesSection: React.FC<{
             <option value="doctorate">Doctorate</option>
             <option value="noPreference">No Preference</option>
           </select>
+        </div>
+        <div className="mt-3">
+          <label className="block text-sm font-medium text-gray-700">
+            
+          </label>
+          <textarea
+            name="additionalComments"
+            value={profile.additionalComments}
+            onChange={onInputChange}
+            className="mt-1 w-full rounded-md border border-gray-300 p-2 focus:border-indigo-600 focus:outline-none"
+            placeholder="Anything else you want to mention"
+            rows={3}
+          />
         </div>
         <div className="mt-3">
           <label className="block text-sm font-medium text-gray-700">Professional Field</label>
@@ -1654,6 +1740,19 @@ const PartnerPreferencesSection: React.FC<{
           </select>
         </div>
         <div className="mt-3">
+          <label className="block text-sm font-medium text-gray-700">
+            
+          </label>
+          <textarea
+            name="livingArrangementComment"
+            value={profile.livingArrangementComment}
+            onChange={onInputChange}
+            className="mt-1 w-full rounded-md border border-gray-300 p-2 focus:border-indigo-600 focus:outline-none"
+            placeholder="Anything else you want to mention"
+            rows={3}
+          />
+        </div>
+        <div className="mt-3">
           <label className="block text-sm font-medium text-gray-700">Career Support Expectations</label>
           <select
             name="careerSupportExpectations"
@@ -1670,7 +1769,7 @@ const PartnerPreferencesSection: React.FC<{
         </div>
         <div className="mt-3">
           <label className="block text-sm font-medium text-gray-700">
-            Anything else you want to mention
+            
           </label>
           <textarea
             name="additionalComments"
@@ -1762,6 +1861,19 @@ const PartnerPreferencesSection: React.FC<{
           </div>
         </div>
       </div>
+      <div className="mt-3">
+          <label className="block text-sm font-medium text-gray-700">
+            Any additional notes you want to add
+          </label>
+          <textarea
+            name="additionalComments"
+            value={profile.additionalComments}
+            onChange={onInputChange}
+            className="mt-1 w-full rounded-md border border-gray-300 p-2 focus:border-indigo-600 focus:outline-none"
+            
+            rows={3}
+          />
+        </div>
       
     </div>
   );
