@@ -70,6 +70,10 @@ interface ProfileData {
   lifestylePreferences: LifestylePreferences;
   livingWithInLaws: string;
   livingArrangementComment: string;
+  fertilityComment: string;
+  preferredReligionComment: string;
+  preferredEducationComment: string;
+  careerSupportComment: string;
   careerSupportExpectations: string;
   necessaryPreferences: string[];
   additionalComments: string;
@@ -93,6 +97,10 @@ interface CompletionResult {
 const parseAdditionalComments = (value: string | null | undefined) => {
   let generalComment = "";
   let livingArrangementComment = "";
+  let fertilityComment = "";
+  let preferredReligionComment = "";
+  let preferredEducationComment = "";
+  let careerSupportComment = "";
 
   if (!value) {
     return { generalComment, livingArrangementComment };
@@ -113,20 +121,53 @@ const parseAdditionalComments = (value: string | null | undefined) => {
       if (typeof parsed.livingArrangementComment === "string") {
         livingArrangementComment = parsed.livingArrangementComment;
       }
+      if (typeof parsed.fertilityComment === "string") {
+        fertilityComment = parsed.fertilityComment;
+      }
+      if (typeof parsed.preferredReligionComment === "string") {
+        preferredReligionComment = parsed.preferredReligionComment;
+      }
+      if (typeof parsed.preferredEducationComment === "string") {
+        preferredEducationComment = parsed.preferredEducationComment;
+      }
+      if (typeof parsed.careerSupportComment === "string") {
+        careerSupportComment = parsed.careerSupportComment;
+      }
 
-      return { generalComment, livingArrangementComment };
+      return {
+        generalComment,
+        livingArrangementComment,
+        fertilityComment,
+        preferredReligionComment,
+        preferredEducationComment,
+        careerSupportComment
+      };
     }
 
     if (typeof parsed === "string") {
       generalComment = parsed;
-      return { generalComment, livingArrangementComment };
+      return {
+        generalComment,
+        livingArrangementComment,
+        fertilityComment,
+        preferredReligionComment,
+        preferredEducationComment,
+        careerSupportComment
+      };
     }
   } catch {
     // Backward compatibility with legacy plain-text comments.
   }
 
   generalComment = value;
-  return { generalComment, livingArrangementComment };
+  return {
+    generalComment,
+    livingArrangementComment,
+    fertilityComment,
+    preferredReligionComment,
+    preferredEducationComment,
+    careerSupportComment
+  };
 };
 
 const isFilled = (value: unknown): boolean => {
@@ -265,6 +306,10 @@ const ProfilePage: React.FC = () => {
     },
     livingWithInLaws: "",
     livingArrangementComment: "",
+    fertilityComment: "",
+    preferredReligionComment: "",
+    preferredEducationComment: "",
+    careerSupportComment: "",
     careerSupportExpectations: "",
     necessaryPreferences: [],
     additionalComments: ""
@@ -474,12 +519,13 @@ const ProfilePage: React.FC = () => {
         lifestyle_pref_dietary_match: profile.lifestylePreferences.dietaryMatch,
         living_with_in_laws: profile.livingWithInLaws,
         living_arrangement_comment: profile.livingArrangementComment,
+        fertility_comment: profile.fertilityComment,
+        preferred_religion_comment: profile.preferredReligionComment,
+        preferred_education_comment: profile.preferredEducationComment,
         career_support_expectations: profile.careerSupportExpectations,
+        career_support_comment: profile.careerSupportComment,
         necessary_preferences: JSON.stringify(profile.necessaryPreferences),
-        additional_comments: JSON.stringify({
-          generalComment: profile.additionalComments,
-          livingArrangementComment: profile.livingArrangementComment
-        }),
+        additional_comments: profile.additionalComments,
         is_completed: true
       };
 
@@ -623,6 +669,10 @@ const ProfilePage: React.FC = () => {
             },
             livingWithInLaws: data.living_with_in_laws || '',
             livingArrangementComment: data.living_arrangement_comment || parsedAdditionalComments.livingArrangementComment || '',
+            fertilityComment: data.fertility_comment || parsedAdditionalComments.fertilityComment || '',
+            preferredReligionComment: data.preferred_religion_comment || parsedAdditionalComments.preferredReligionComment || '',
+            preferredEducationComment: data.preferred_education_comment || parsedAdditionalComments.preferredEducationComment || '',
+            careerSupportComment: data.career_support_comment || parsedAdditionalComments.careerSupportComment || '',
             careerSupportExpectations: data.career_support_expectations || '',
             necessaryPreferences: data.necessary_preferences ? JSON.parse(data.necessary_preferences) : [],
             additionalComments: parsedAdditionalComments.generalComment
@@ -1242,14 +1292,14 @@ const PersonalInfoSection: React.FC<{
             </div>
             <div className="mt-3">
           <label className="block text-sm font-medium text-gray-700">
-            
+            Any fertility-related notes
           </label>
           <textarea
-            name="additionalComments"
-            value={profile.additionalComments}
+            name="fertilityComment"
+            value={profile.fertilityComment}
             onChange={onInputChange}
             className="mt-1 w-full rounded-md border border-gray-300 p-2 focus:border-indigo-600 focus:outline-none"
-            placeholder="Anything else you want to mention"
+            placeholder="Share anything important about fertility"
             rows={3}
           />
         </div>
@@ -1574,14 +1624,14 @@ const PartnerPreferencesSection: React.FC<{
       </div>
       <div className="mt-3">
           <label className="block text-sm font-medium text-gray-700">
-           
+            Any faith-related notes
           </label>
           <textarea
-            name="additionalComments"
-            value={profile.additionalComments}
+            name="preferredReligionComment"
+            value={profile.preferredReligionComment}
             onChange={onInputChange}
             className="mt-1 w-full rounded-md border border-gray-300 p-2 focus:border-indigo-600 focus:outline-none"
-            placeholder="Anything else you want to mention"
+            placeholder="Share anything important about religion"
             rows={3}
           />
         </div>  
@@ -1607,14 +1657,14 @@ const PartnerPreferencesSection: React.FC<{
         </div>
         <div className="mt-3">
           <label className="block text-sm font-medium text-gray-700">
-            
+            Any education-related notes
           </label>
           <textarea
-            name="additionalComments"
-            value={profile.additionalComments}
+            name="preferredEducationComment"
+            value={profile.preferredEducationComment}
             onChange={onInputChange}
             className="mt-1 w-full rounded-md border border-gray-300 p-2 focus:border-indigo-600 focus:outline-none"
-            placeholder="Anything else you want to mention"
+            placeholder="Share anything important about education"
             rows={3}
           />
         </div>
@@ -1741,14 +1791,14 @@ const PartnerPreferencesSection: React.FC<{
         </div>
         <div className="mt-3">
           <label className="block text-sm font-medium text-gray-700">
-            
+            Any living-arrangement notes
           </label>
           <textarea
             name="livingArrangementComment"
             value={profile.livingArrangementComment}
             onChange={onInputChange}
             className="mt-1 w-full rounded-md border border-gray-300 p-2 focus:border-indigo-600 focus:outline-none"
-            placeholder="Anything else you want to mention"
+            placeholder="Share anything important about living arrangements"
             rows={3}
           />
         </div>
@@ -1769,14 +1819,14 @@ const PartnerPreferencesSection: React.FC<{
         </div>
         <div className="mt-3">
           <label className="block text-sm font-medium text-gray-700">
-            
+            Any career-support notes
           </label>
           <textarea
-            name="additionalComments"
-            value={profile.additionalComments}
+            name="careerSupportComment"
+            value={profile.careerSupportComment}
             onChange={onInputChange}
             className="mt-1 w-full rounded-md border border-gray-300 p-2 focus:border-indigo-600 focus:outline-none"
-            placeholder="Anything else you want to mention"
+            placeholder="Share anything important about career support"
             rows={3}
           />
         </div>
@@ -1863,14 +1913,14 @@ const PartnerPreferencesSection: React.FC<{
       </div>
       <div className="mt-3">
           <label className="block text-sm font-medium text-gray-700">
-            Any additional notes you want to add
+            Any other preferences or expectations
           </label>
           <textarea
             name="additionalComments"
             value={profile.additionalComments}
             onChange={onInputChange}
             className="mt-1 w-full rounded-md border border-gray-300 p-2 focus:border-indigo-600 focus:outline-none"
-            
+            placeholder="Share anything else you'd like to mention"
             rows={3}
           />
         </div>
