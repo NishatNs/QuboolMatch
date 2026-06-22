@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, R
 from sqlalchemy.orm import Session
 from database import get_db
 from models.user.user import User
+from models.verification_rejection import VerificationRejection
 from shared.token import get_current_user, get_current_admin_user
 from pydantic import BaseModel
 from typing import Optional
@@ -26,6 +27,7 @@ class VerificationStatusResponse(BaseModel):
     verification_time: Optional[str] = None
     verified_at: Optional[str] = None
     verification_notes: Optional[str] = None
+    rejection_notes: Optional[str] = None
     has_nid_image: bool = False
     nid_image_filename: Optional[str] = None
     has_recent_image: bool = False
@@ -90,6 +92,9 @@ async def submit_verification(
             verification_time=parsed_time,
             verification_notes=verification_notes
         )
+        db.query(VerificationRejection).filter(
+            VerificationRejection.user_id == current_user.id
+        ).delete()
         
         # Commit changes to database
         db.commit()
@@ -114,12 +119,17 @@ async def get_verification_status(
     """
     Get current verification status for the user
     """
+    rejection = db.query(VerificationRejection).filter(
+        VerificationRejection.user_id == current_user.id
+    ).first()
+
     return VerificationStatusResponse(
         verification_status=current_user.verification_status,
         verification_date=current_user.verification_date.isoformat() if current_user.verification_date else None,
         verification_time=current_user.verification_time.isoformat() if current_user.verification_time else None,
         verified_at=current_user.verified_at.isoformat() if current_user.verified_at else None,
         verification_notes=current_user.verification_notes,
+        rejection_notes=rejection.notes if rejection else None,
         has_nid_image=bool(current_user.nid_image_data),
         nid_image_filename=current_user.nid_image_filename,
         has_recent_image=bool(current_user.recent_image_data),
@@ -234,6 +244,9 @@ async def approve_verification(
         raise HTTPException(status_code=404, detail="User not found")
     
     user.verify()
+    db.query(VerificationRejection).filter(
+        VerificationRejection.user_id == user_id
+    ).delete()
     db.commit()
     
     return {"success": True, "message": "User verification approved"}
@@ -253,6 +266,13 @@ async def reject_verification(
         raise HTTPException(status_code=404, detail="User not found")
     
     user.reject_verification(rejection_notes)
+    existing_rejection = db.query(VerificationRejection).filter(
+        VerificationRejection.user_id == user_id
+    ).first()
+    if existing_rejection:
+        existing_rejection.notes = rejection_notes
+    else:
+        db.add(VerificationRejection(user_id=user_id, notes=rejection_notes))
     db.commit()
     
     return {"success": True, "message": "User verification rejected"}

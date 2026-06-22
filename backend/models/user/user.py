@@ -116,8 +116,6 @@ class User(Base):
 
     def reject_verification(self, notes: str = None):
         self.verification_status = "rejected"
-        if notes:
-            self.verification_notes = notes
         return self
 
     def verify_guardian(self):

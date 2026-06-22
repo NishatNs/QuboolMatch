@@ -309,9 +309,9 @@ const NIDVerification: React.FC = () => {
               {status === "Verification Rejected" && (
                 <p className="text-xs mt-2 opacity-90">
                   Your verification was rejected. Please resubmit with correct information.
-                  {currentStatus?.verification_notes && (
+                  {currentStatus?.rejection_notes && (
                     <span className="block mt-1 font-medium">
-                      Reason: {currentStatus.verification_notes}
+                      Reason: {currentStatus.rejection_notes}
                     </span>
                   )}
                 </p>
