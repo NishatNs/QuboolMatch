@@ -13,6 +13,9 @@ class Profile(Base):
     
     # Personal Information
     location = Column(String, nullable=True)
+    father_name = Column(String, nullable=True)
+    mother_name = Column(String, nullable=True)
+    guardian_for_verification = Column(String, nullable=True)
     guardian_name = Column(String, nullable=True)
     guardian_relation = Column(String, nullable=True)
     guardian_relation_other = Column(String, nullable=True)
@@ -138,6 +141,9 @@ class Profile(Base):
             'id': self.id,
             'user_id': self.user_id,
             'location': self.location,
+            'father_name': self.father_name,
+            'mother_name': self.mother_name,
+            'guardian_for_verification': self.guardian_for_verification,
             'guardian_name': self.guardian_name,
             'guardian_relation': self.guardian_relation,
             'guardian_relation_other': self.guardian_relation_other,

@@ -15,9 +15,12 @@ interface ProfileData {
   // Personal Information
   name: string;
   age: string;
+  dateOfBirth: string;
   gender: string;
   location: string;
-  guardianName: string;
+  fatherName: string;
+  motherName: string;
+  guardianForVerification: string;
   guardianRelation: string;
   guardianRelationOther: string;
   guardianContactNumber: string;
@@ -190,13 +193,16 @@ const getProfileCompletion = (profile: ProfileData): CompletionResult => {
   const personalFields = [
     profile.name,
     profile.age,
+    profile.dateOfBirth,
     profile.gender,
     profile.location,
     profile.religion,
     profile.maritalStatus,
     profile.academicBackground,
     profile.profession,
-    profile.guardianName,
+    profile.fatherName,
+    profile.motherName,
+    profile.guardianForVerification,
     profile.guardianRelation,
     profile.guardianContactNumber
   ];
@@ -248,9 +254,12 @@ const ProfilePage: React.FC = () => {
     // Personal Information
     name: "",
     age: "",
+    dateOfBirth: "",
     gender: "",
     location: "",
-    guardianName: "",
+    fatherName: "",
+    motherName: "",
+    guardianForVerification: "",
     guardianRelation: "",
     guardianRelationOther: "",
     guardianContactNumber: "",
@@ -472,10 +481,13 @@ const ProfilePage: React.FC = () => {
       const profileData = {
         name: profile.name,
         age: profile.age ? parseInt(profile.age) : null,
+        date_of_birth: profile.dateOfBirth || null,
         gender: profile.gender,
         religion: profile.religion,
         location: profile.location,
-        guardian_name: profile.guardianName,
+        father_name: profile.fatherName,
+        mother_name: profile.motherName,
+        guardian_for_verification: profile.guardianForVerification,
         guardian_relation: profile.guardianRelation,
         guardian_relation_other: profile.guardianRelationOther,
         guardian_contact_number: profile.guardianContactNumber,
@@ -620,9 +632,12 @@ const ProfilePage: React.FC = () => {
           setProfile({
             name: data.name || '',
             age: data.age || '',
+            dateOfBirth: data.date_of_birth || '',
             gender: data.gender || '',
             location: data.location || '',
-            guardianName: data.guardian_name || '',
+            fatherName: data.father_name || data.guardian_name || '',
+            motherName: data.mother_name || '',
+            guardianForVerification: data.guardian_for_verification || '',
             guardianRelation: data.guardian_relation || '',
             guardianRelationOther: data.guardian_relation_other || '',
             guardianContactNumber: data.guardian_contact_number || '',
@@ -813,6 +828,16 @@ const ProfileHeader: React.FC<{
             />
           </div>
           <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
+            <input
+              type="date"
+              name="dateOfBirth"
+              value={profile.dateOfBirth}
+              onChange={onInputChange}
+              className="bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 w-full"
+            />
+          </div>
+          <div className="mt-4">
             <label className="block text-sm font-medium text-gray-700">Gender</label>
             <select
               name="gender"
@@ -827,14 +852,36 @@ const ProfileHeader: React.FC<{
             </select>
           </div>
           <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700">Guardian's Name</label>
+            <label className="block text-sm font-medium text-gray-700">Father's Name</label>
             <input
               type="text"
-              name="guardianName"
-              value={profile.guardianName}
+              name="fatherName"
+              value={profile.fatherName}
               onChange={onInputChange}
               className="bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 w-full"
-              placeholder="Enter guardian's name"
+              placeholder="Enter father's name"
+            />
+          </div>
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700">Mother's Name</label>
+            <input
+              type="text"
+              name="motherName"
+              value={profile.motherName}
+              onChange={onInputChange}
+              className="bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 w-full"
+              placeholder="Enter mother's name"
+            />
+          </div>
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700">Guardian for Verification</label>
+            <input
+              type="text"
+              name="guardianForVerification"
+              value={profile.guardianForVerification}
+              onChange={onInputChange}
+              className="bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 w-full"
+              placeholder="Father, mother, or legal guardian"
             />
           </div>
           <div className="mt-4">
