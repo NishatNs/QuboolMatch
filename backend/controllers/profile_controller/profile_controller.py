@@ -98,7 +98,6 @@ class ProfileCreate(BaseModel):
     location: Optional[str] = None
     father_name: Optional[str] = None
     mother_name: Optional[str] = None
-    guardian_for_verification: Optional[str] = None
     guardian_name: Optional[str] = None
     guardian_relation: Optional[str] = None
     guardian_relation_other: Optional[str] = None

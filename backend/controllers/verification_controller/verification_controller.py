@@ -1,4 +1,5 @@
 from datetime import datetime, date, time
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Response
 from sqlalchemy.orm import Session
 from database import get_db
@@ -35,8 +36,8 @@ class VerificationStatusResponse(BaseModel):
 
 @router.post("/submit", response_model=VerificationResponse)
 async def submit_verification(
-    verification_date: str = Form(...),
-    verification_time: str = Form(...),
+    verification_date: Optional[str] = Form(None),
+    verification_time: Optional[str] = Form(None),
     verification_notes: Optional[str] = Form(None),
     nid_image: UploadFile = File(...),
     recent_image: Optional[UploadFile] = File(None),
@@ -73,12 +74,19 @@ async def submit_verification(
             recent_image_filename = recent_image.filename
             recent_image_content_type = recent_image.content_type
         
-        # Parse date and time
-        try:
-            parsed_date = datetime.strptime(verification_date, "%Y-%m-%d").date()
-            parsed_time = datetime.strptime(verification_time, "%H:%M").time()
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=f"Invalid date or time format: {str(e)}")
+        # Parse date and time only if provided
+        parsed_date = None
+        parsed_time = None
+        if verification_date:
+            try:
+                parsed_date = datetime.strptime(verification_date, "%Y-%m-%d").date()
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=f"Invalid date format: {str(e)}")
+        if verification_time:
+            try:
+                parsed_time = datetime.strptime(verification_time, "%H:%M").time()
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=f"Invalid time format: {str(e)}")
         
         # Update user verification info with binary data
         current_user.update_verification_info(

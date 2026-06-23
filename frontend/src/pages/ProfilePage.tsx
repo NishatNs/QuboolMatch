@@ -20,7 +20,7 @@ interface ProfileData {
   location: string;
   fatherName: string;
   motherName: string;
-  guardianForVerification: string;
+  guardianName: string;
   guardianRelation: string;
   guardianRelationOther: string;
   guardianContactNumber: string;
@@ -202,7 +202,7 @@ const getProfileCompletion = (profile: ProfileData): CompletionResult => {
     profile.profession,
     profile.fatherName,
     profile.motherName,
-    profile.guardianForVerification,
+    profile.guardianName,
     profile.guardianRelation,
     profile.guardianContactNumber
   ];
@@ -259,7 +259,7 @@ const ProfilePage: React.FC = () => {
     location: "",
     fatherName: "",
     motherName: "",
-    guardianForVerification: "",
+    guardianName: "",
     guardianRelation: "",
     guardianRelationOther: "",
     guardianContactNumber: "",
@@ -487,7 +487,7 @@ const ProfilePage: React.FC = () => {
         location: profile.location,
         father_name: profile.fatherName,
         mother_name: profile.motherName,
-        guardian_for_verification: profile.guardianForVerification,
+        guardian_name: profile.guardianName,
         guardian_relation: profile.guardianRelation,
         guardian_relation_other: profile.guardianRelationOther,
         guardian_contact_number: profile.guardianContactNumber,
@@ -637,7 +637,7 @@ const ProfilePage: React.FC = () => {
             location: data.location || '',
             fatherName: data.father_name || data.guardian_name || '',
             motherName: data.mother_name || '',
-            guardianForVerification: data.guardian_for_verification || '',
+            guardianName: data.guardian_name || '',
             guardianRelation: data.guardian_relation || '',
             guardianRelationOther: data.guardian_relation_other || '',
             guardianContactNumber: data.guardian_contact_number || '',
@@ -874,11 +874,11 @@ const ProfileHeader: React.FC<{
             />
           </div>
           <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700">Guardian for Verification</label>
+            <label className="block text-sm font-medium text-gray-700">Guardian Name ( For Verification)</label>
             <input
               type="text"
-              name="guardianForVerification"
-              value={profile.guardianForVerification}
+              name="guardianName"
+              value={profile.guardianName}
               onChange={onInputChange}
               className="bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 w-full"
               placeholder="Father, mother, or legal guardian"
