@@ -1,7 +1,11 @@
+import os
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
+os.environ.setdefault("GEMINI_API_KEY", "test-gemini-key")
+
 from main import app
 from database import Base, get_db
 from config import get_settings

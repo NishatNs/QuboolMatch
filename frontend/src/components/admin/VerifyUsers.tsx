@@ -6,15 +6,10 @@ interface PendingUser {
   email: string;
   verification_status: string;
   guardian_verification_status: string;
-  verification_date: string | null;
-  verification_time: string | null;
   has_nid_image: boolean;
   nid_image_filename: string | null;
-  has_recent_image: boolean;
-  recent_image_filename: string | null;
   verification_notes: string | null;
   created_at: string;
-  matching_percentage: number | null;
 }
 
 interface PendingVerificationsResponse {
@@ -26,7 +21,6 @@ const VerifyUsers: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [processingUserId, setProcessingUserId] = useState<string | null>(null);
-  const [matchingUserId, setMatchingUserId] = useState<string | null>(null);
   const [guardianProcessingUserId, setGuardianProcessingUserId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -49,10 +43,10 @@ const VerifyUsers: React.FC = () => {
 
       const data: PendingVerificationsResponse = await response.json();
       
-      // Sort by verification_date (most recent first)
+      // Sort by creation time (most recent first)
       const sortedUsers = data.pending_verifications.sort((a, b) => {
-        const dateA = new Date(a.verification_date || a.created_at);
-        const dateB = new Date(b.verification_date || b.created_at);
+        const dateA = new Date(a.created_at);
+        const dateB = new Date(b.created_at);
         return dateB.getTime() - dateA.getTime();
       });
       
@@ -205,80 +199,11 @@ const VerifyUsers: React.FC = () => {
     }
   };
 
-  const viewRecentImage = async (userId: string) => {
-    try {
-      const token = localStorage.getItem('adminAccessToken');
-      const response = await fetch(`${API_BASE_URL}/verification/recent-image/${userId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch recent image');
-      }
-
-      const blob = await response.blob();
-      const imageUrl = URL.createObjectURL(blob);
-      
-      // Open image in new window
-      window.open(imageUrl, '_blank');
-    } catch (error) {
-      alert(error instanceof Error ? error.message : 'Failed to view recent image');
-    }
-  };
-
-  const handleMatchImages = async (userId: string) => {
-    setMatchingUserId(userId);
-    try {
-      const token = localStorage.getItem('adminAccessToken');
-      const response = await fetch(`${API_BASE_URL}/verification/match-images/${userId}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to match images');
-      }
-
-      const data = await response.json();
-
-      if (!data.success) {
-        alert(`Error: ${data.error}`);
-        return;
-      }
-
-      // Update the user's matching percentage in the state
-      setPendingUsers(prev => prev.map(user => 
-        user.id === userId 
-          ? { ...user, matching_percentage: data.matchingPercentage }
-          : user
-      ));
-
-      // Show success message
-      alert(`Match successful! Matching percentage: ${data.matchingPercentage.toFixed(1)}%`);
-    } catch (error) {
-      alert(error instanceof Error ? error.message : 'Failed to match images');
-    } finally {
-      setMatchingUserId(null);
-    }
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
-    });
-  };
-
-  const formatTime = (timeString: string) => {
-    return new Date(`2000-01-01T${timeString}`).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit'
     });
   };
 
@@ -326,19 +251,10 @@ const VerifyUsers: React.FC = () => {
                   User
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Verification Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   NID Document
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Recent Image
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Match
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Guardian Verified
@@ -357,14 +273,6 @@ const VerifyUsers: React.FC = () => {
                       <div className="text-sm text-gray-500">
                         Registered: {formatDate(user.created_at)}
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {user.verification_date ? formatDate(user.verification_date) : 'Not set'}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {user.verification_time ? formatTime(user.verification_time) : ''}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -387,40 +295,6 @@ const VerifyUsers: React.FC = () => {
                     ) : (
                       <span className="text-gray-400 text-sm">No image</span>
                     )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {user.has_recent_image ? (
-                      <button
-                        onClick={() => viewRecentImage(user.id)}
-                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                      >
-                        View Recent Image
-                      </button>
-                    ) : (
-                      <span className="text-gray-400 text-sm">No image</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handleMatchImages(user.id)}
-                        disabled={matchingUserId === user.id}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {matchingUserId === user.id ? 'Matching...' : 'Match'}
-                      </button>
-                      {user.matching_percentage !== null && user.matching_percentage !== undefined && (
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          user.matching_percentage >= 80 
-                            ? 'bg-green-100 text-green-800'
-                            : user.matching_percentage >= 50
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {user.matching_percentage.toFixed(1)}%
-                        </span>
-                      )}
-                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">

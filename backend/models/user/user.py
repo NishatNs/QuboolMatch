@@ -1,7 +1,9 @@
 import uuid
 import bcrypt
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Boolean, DateTime, Date, Time, Text, LargeBinary, Integer, Float
+from typing import Optional
+
+from sqlalchemy import Column, String, Boolean, Date, DateTime, Text, LargeBinary, Integer, Float, JSON
 from database import Base
 
 
@@ -35,18 +37,19 @@ class User(Base):
     nid_image_data = Column(LargeBinary, nullable=True)  # Binary data of uploaded NID image
     nid_image_filename = Column(String, nullable=True)  # Original filename
     nid_image_content_type = Column(String, nullable=True)  # MIME type (image/jpeg, etc.)
-    
-    # Recent verification image fields
-    recent_image_data = Column(LargeBinary, nullable=True)  # Binary data of recent verification image
-    recent_image_filename = Column(String, nullable=True)  # Original filename
-    recent_image_content_type = Column(String, nullable=True)  # MIME type (image/jpeg, etc.)
-    
-    verification_date = Column(Date, nullable=True)  # Scheduled verification date
-    verification_time = Column(Time, nullable=True)  # Scheduled verification time
     verification_status = Column(String, default="not_submitted")  # not_submitted, pending, verified, rejected
     verification_notes = Column(Text, nullable=True)  # Additional notes for verification
     verified_at = Column(DateTime, nullable=True)  # When verification was completed
     matching_percentage = Column(Float, nullable=True)  # AI-based face matching percentage (0-100)
+    ocr_name = Column(String, nullable=True)
+    ocr_father_name = Column(String, nullable=True)
+    ocr_mother_name = Column(String, nullable=True)
+    ocr_date_of_birth = Column(Date, nullable=True)
+    ocr_nid_number = Column(String, nullable=True)
+    ocr_image_quality = Column(String, nullable=True)
+    ocr_warnings = Column(JSON, nullable=True)
+    ocr_confirmed = Column(Boolean, default=False, nullable=False)
+    ocr_processed_at = Column(DateTime, nullable=True)
 
     guardian_verification_status = Column(String, default="not_submitted", nullable=False)
 
@@ -68,6 +71,7 @@ class User(Base):
         self.is_archived = False
         self.verification_status = "not_submitted"
         self.guardian_verification_status = "not_submitted"
+        self.ocr_confirmed = False
 
     def check_password(self, password: str) -> bool:
         return bcrypt.checkpw(password.encode(), self.hashed_password.encode())
@@ -85,29 +89,41 @@ class User(Base):
         return self
 
     def update_verification_info(self, nid_image_data: bytes = None, nid_image_filename: str = None,
-                               nid_image_content_type: str = None, recent_image_data: bytes = None,
-                               recent_image_filename: str = None, recent_image_content_type: str = None,
-                               verification_date=None, verification_time=None, verification_notes: str = None):
+                               nid_image_content_type: str = None,
+                               verification_notes: str = None):
         if nid_image_data:
             self.nid_image_data = nid_image_data
         if nid_image_filename:
             self.nid_image_filename = nid_image_filename
         if nid_image_content_type:
             self.nid_image_content_type = nid_image_content_type
-        if recent_image_data:
-            self.recent_image_data = recent_image_data
-        if recent_image_filename:
-            self.recent_image_filename = recent_image_filename
-        if recent_image_content_type:
-            self.recent_image_content_type = recent_image_content_type
-        if verification_date:
-            self.verification_date = verification_date
-        if verification_time:
-            self.verification_time = verification_time
         if verification_notes:
             self.verification_notes = verification_notes
         # Keep status as pending until admin verifies
         self.verification_status = "pending"
+        return self
+
+    def update_ocr_extraction(
+        self,
+        *,
+        ocr_name: Optional[str] = None,
+        ocr_father_name: Optional[str] = None,
+        ocr_mother_name: Optional[str] = None,
+        ocr_date_of_birth=None,
+        ocr_nid_number: Optional[str] = None,
+        ocr_image_quality: Optional[str] = None,
+        ocr_warnings=None,
+        processed_at=None,
+    ):
+        self.ocr_name = ocr_name
+        self.ocr_father_name = ocr_father_name
+        self.ocr_mother_name = ocr_mother_name
+        self.ocr_date_of_birth = ocr_date_of_birth
+        self.ocr_nid_number = ocr_nid_number
+        self.ocr_image_quality = ocr_image_quality
+        self.ocr_warnings = ocr_warnings or []
+        self.ocr_confirmed = False
+        self.ocr_processed_at = processed_at
         return self
 
     def verify(self):

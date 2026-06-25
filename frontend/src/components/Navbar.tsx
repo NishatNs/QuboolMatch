@@ -12,7 +12,9 @@ const Navbar: React.FC = () => {
   const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
 
   const refreshBadges = async () => {
-    if (!isLoggedIn) {
+    const token = localStorage.getItem('accessToken');
+
+    if (!isLoggedIn || !token) {
       setMessageUnreadCount(0);
       setNotificationUnreadCount(0);
       return;
