@@ -18,6 +18,36 @@ type ExtractedNidInformation = {
   warnings: string[];
 };
 
+type VerificationStatusResponse = {
+  verification_status: string;
+  verified_at?: string | null;
+  verification_notes?: string | null;
+  rejection_notes?: string | null;
+  ocr_name?: string | null;
+  ocr_father_name?: string | null;
+  ocr_mother_name?: string | null;
+  ocr_date_of_birth?: string | null;
+  ocr_nid_number?: string | null;
+  ocr_image_quality?: string | null;
+  ocr_warnings?: string[] | null;
+  ocr_confirmed?: boolean;
+  ocr_processed_at?: string | null;
+  has_nid_image?: boolean;
+  nid_image_filename?: string | null;
+};
+
+const hasSavedOcrData = (statusData: VerificationStatusResponse) =>
+  Boolean(
+    statusData.ocr_name ||
+      statusData.ocr_father_name ||
+      statusData.ocr_mother_name ||
+      statusData.ocr_date_of_birth ||
+      statusData.ocr_nid_number ||
+      statusData.ocr_image_quality ||
+      (statusData.ocr_warnings && statusData.ocr_warnings.length > 0) ||
+      statusData.ocr_processed_at
+  );
+
 const NIDVerification: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
@@ -47,11 +77,27 @@ const NIDVerification: React.FC = () => {
         });
 
         if (response.ok) {
-          const statusData = await response.json();
+          const statusData: VerificationStatusResponse = await response.json();
           setCurrentStatus(statusData);
 
-          if (statusData.verification_notes) {
-            setNotes(statusData.verification_notes);
+          setNotes(statusData.verification_notes ?? "");
+          setOcrConfirmed(Boolean(statusData.ocr_confirmed));
+
+          if (hasSavedOcrData(statusData)) {
+            setOcrData({
+              document_detected: true,
+              name: statusData.ocr_name ?? null,
+              father_name: statusData.ocr_father_name ?? null,
+              mother_name: statusData.ocr_mother_name ?? null,
+              date_of_birth: statusData.ocr_date_of_birth ?? null,
+              nid_number: statusData.ocr_nid_number ?? null,
+              image_quality: statusData.ocr_image_quality ?? null,
+              warnings: statusData.ocr_warnings ?? [],
+            });
+            setOcrStatus("success");
+          } else {
+            setOcrData(null);
+            setOcrStatus("idle");
           }
 
           if (statusData.verification_status === "verified") {
