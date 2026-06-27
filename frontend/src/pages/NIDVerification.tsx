@@ -2,7 +2,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import NIDImageDisplay from "../components/NIDImageDisplay";
-import ReadOnlyField from "../components/ReadOnlyField";
 import { getAccessToken, API_BASE_URL } from "../services/api";
 
 type OcrStatus = "idle" | "processing" | "success" | "failed";
@@ -214,31 +213,6 @@ const NIDVerification: React.FC = () => {
     }
   };
 
-  const maskNidNumber = (value: string | null | undefined) => {
-    if (!value) {
-      return "";
-    }
-
-    return value.replace(/\d(?=\d{4})/g, "*");
-  };
-
-  const formatDateOfBirth = (value: string | null | undefined) => {
-    if (!value) {
-      return null;
-    }
-
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) {
-      return value;
-    }
-
-    return parsed.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -345,6 +319,13 @@ const NIDVerification: React.FC = () => {
     );
   };
 
+  const updateOcrField = <K extends keyof ExtractedNidInformation,>(
+    field: K,
+    value: ExtractedNidInformation[K]
+  ) => {
+    setOcrData((previous) => (previous ? { ...previous, [field]: value } : previous));
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="w-full max-w-lg bg-white shadow-lg rounded-lg p-6">
@@ -406,21 +387,60 @@ const NIDVerification: React.FC = () => {
                 Information detected from your NID:
               </h3>
               <p className="mt-1 text-sm text-gray-600">
-                Review the information extracted from your uploaded NID. These identity fields are read-only and cannot be edited here.
+                Review and edit the information extracted from your uploaded NID if needed.
               </p>
 
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <ReadOnlyField label="Full Name" value={ocrData.name} />
-                <ReadOnlyField label="Father's Name" value={ocrData.father_name} />
-                <ReadOnlyField label="Mother's Name" value={ocrData.mother_name} />
-                <ReadOnlyField
-                  label="Date of Birth"
-                  value={formatDateOfBirth(ocrData.date_of_birth)}
-                />
-                <ReadOnlyField
-                  label="NID Number"
-                  value={maskNidNumber(ocrData.nid_number)}
-                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Full Name</label>
+                  <input
+                    type="text"
+                    value={ocrData.name ?? ""}
+                    onChange={(e) => updateOcrField("name", e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-4 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    placeholder="Enter full name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Father's Name</label>
+                  <input
+                    type="text"
+                    value={ocrData.father_name ?? ""}
+                    onChange={(e) => updateOcrField("father_name", e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-4 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    placeholder="Enter father's name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Mother's Name</label>
+                  <input
+                    type="text"
+                    value={ocrData.mother_name ?? ""}
+                    onChange={(e) => updateOcrField("mother_name", e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-4 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    placeholder="Enter mother's name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
+                  <input
+                    type="text"
+                    value={ocrData.date_of_birth ?? ""}
+                    onChange={(e) => updateOcrField("date_of_birth", e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-4 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    placeholder="YYYY-MM-DD"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700">NID Number</label>
+                  <input
+                    type="text"
+                    value={ocrData.nid_number ?? ""}
+                    onChange={(e) => updateOcrField("nid_number", e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-4 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    placeholder="Enter NID number"
+                  />
+                </div>
               </div>
 
               {ocrData.warnings.length > 0 && (
