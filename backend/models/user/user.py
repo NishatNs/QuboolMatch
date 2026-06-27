@@ -50,6 +50,12 @@ class User(Base):
     ocr_warnings = Column(JSON, nullable=True)
     ocr_confirmed = Column(Boolean, default=False, nullable=False)
     ocr_processed_at = Column(DateTime, nullable=True)
+    ocr_name_match_score = Column(Float, nullable=True)
+    ocr_name_match_status = Column(String(30), nullable=True)
+    ocr_nid_match = Column(Boolean, nullable=True)
+    ocr_dob_match = Column(Boolean, nullable=True)
+    ocr_review_status = Column(String(30), nullable=True)
+    admin_review_notes = Column(Text, nullable=True)
 
     guardian_verification_status = Column(String, default="not_submitted", nullable=False)
 
@@ -72,6 +78,8 @@ class User(Base):
         self.verification_status = "not_submitted"
         self.guardian_verification_status = "not_submitted"
         self.ocr_confirmed = False
+        self.ocr_review_status = "pending_review"
+        self.admin_review_notes = None
 
     def check_password(self, password: str) -> bool:
         return bcrypt.checkpw(password.encode(), self.hashed_password.encode())
@@ -114,6 +122,12 @@ class User(Base):
         ocr_image_quality: Optional[str] = None,
         ocr_warnings=None,
         processed_at=None,
+        ocr_name_match_score: Optional[float] = None,
+        ocr_name_match_status: Optional[str] = None,
+        ocr_nid_match: Optional[bool] = None,
+        ocr_dob_match: Optional[bool] = None,
+        ocr_review_status: Optional[str] = "pending_review",
+        admin_review_notes: Optional[str] = None,
     ):
         self.ocr_name = ocr_name
         self.ocr_father_name = ocr_father_name
@@ -124,6 +138,12 @@ class User(Base):
         self.ocr_warnings = ocr_warnings or []
         self.ocr_confirmed = False
         self.ocr_processed_at = processed_at
+        self.ocr_name_match_score = ocr_name_match_score
+        self.ocr_name_match_status = ocr_name_match_status
+        self.ocr_nid_match = ocr_nid_match
+        self.ocr_dob_match = ocr_dob_match
+        self.ocr_review_status = ocr_review_status
+        self.admin_review_notes = admin_review_notes
         return self
 
     def verify(self):

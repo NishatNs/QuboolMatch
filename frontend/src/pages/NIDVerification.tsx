@@ -20,6 +20,7 @@ type ExtractedNidInformation = {
 
 type VerificationStatusResponse = {
   verification_status: string;
+  admin_review_notes?: string | null;
   verified_at?: string | null;
   verification_notes?: string | null;
   rejection_notes?: string | null;
@@ -51,10 +52,11 @@ const hasSavedOcrData = (statusData: VerificationStatusResponse) =>
 const NIDVerification: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
-  const [status, setStatus] = useState("Not Submitted");
+  const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [currentStatus, setCurrentStatus] = useState<any>(null);
+  const [currentStatus, setCurrentStatus] = useState<VerificationStatusResponse | null>(null);
+  const [statusLoading, setStatusLoading] = useState(true);
   const [ocrStatus, setOcrStatus] = useState<OcrStatus>("idle");
   const [ocrError, setOcrError] = useState("");
   const [ocrConfirmed, setOcrConfirmed] = useState(false);
@@ -62,13 +64,26 @@ const NIDVerification: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const navigate = useNavigate();
 
-  const canContinue = ocrStatus === "success" && Boolean(ocrData) && ocrConfirmed;
+  const backendVerificationStatus = currentStatus?.verification_status ?? null;
+  const isBackendStatusVisible = Boolean(
+    backendVerificationStatus &&
+      ["pending", "verified", "rejected", "resubmission_required", "processing"].includes(backendVerificationStatus)
+  );
+  const canContinue =
+    ocrStatus === "success" &&
+    Boolean(ocrData) &&
+    ocrConfirmed &&
+    backendVerificationStatus !== "pending" &&
+    backendVerificationStatus !== "verified" &&
+    backendVerificationStatus !== "processing";
 
   useEffect(() => {
     const fetchVerificationStatus = async () => {
       try {
         const token = getAccessToken();
-        if (!token) return;
+        if (!token) {
+          return;
+        }
 
         const response = await fetch(`${API_BASE_URL}/verification/status`, {
           headers: {
@@ -82,6 +97,7 @@ const NIDVerification: React.FC = () => {
 
           setNotes(statusData.verification_notes ?? "");
           setOcrConfirmed(Boolean(statusData.ocr_confirmed));
+          setStatus("");
 
           if (hasSavedOcrData(statusData)) {
             setOcrData({
@@ -99,21 +115,11 @@ const NIDVerification: React.FC = () => {
             setOcrData(null);
             setOcrStatus("idle");
           }
-
-          if (statusData.verification_status === "verified") {
-            setStatus("Verified");
-          } else if (statusData.verification_status === "pending") {
-            setStatus("Verification Pending");
-          } else if (statusData.verification_status === "rejected") {
-            setStatus("Verification Rejected");
-          } else if (statusData.verification_status === "not_submitted") {
-            setStatus("Not Submitted");
-          } else {
-            setStatus("Not Submitted");
-          }
         }
       } catch (error) {
         console.error("Error fetching verification status:", error);
+      } finally {
+        setStatusLoading(false);
       }
     };
 
@@ -271,16 +277,18 @@ const NIDVerification: React.FC = () => {
       const data = await response.json();
 
       if (data.success) {
-        setStatus("Verification Pending");
         const statusResponse = await fetch(`${API_BASE_URL}/verification/status`, {
           headers: {
             "Authorization": `Bearer ${token}`
           }
         });
         if (statusResponse.ok) {
-          const statusData = await statusResponse.json();
+          const statusData: VerificationStatusResponse = await statusResponse.json();
           setCurrentStatus(statusData);
+          setNotes(statusData.verification_notes ?? "");
+          setOcrConfirmed(Boolean(statusData.ocr_confirmed));
         }
+        setStatus("");
       } else {
         throw new Error(data.message || "Verification submission failed");
       }
@@ -288,10 +296,53 @@ const NIDVerification: React.FC = () => {
     } catch (err) {
       console.error("Verification submission error:", err);
       setError(err instanceof Error ? err.message : "An error occurred during verification submission");
-      setStatus("Not Submitted");
+      setStatus("");
     } finally {
       setLoading(false);
     }
+  };
+
+  const getStatusLabel = (value: string | null | undefined) => {
+    switch (value) {
+      case "pending":
+        return "Verification Pending";
+      case "verified":
+        return "Verified";
+      case "rejected":
+        return "Verification Rejected";
+      case "resubmission_required":
+        return "Resubmission Required";
+      case "processing":
+        return "Processing";
+      default:
+        return "Not Submitted";
+    }
+  };
+
+  const getStatusBadgeClasses = (value: string | null | undefined) => {
+    switch (value) {
+      case "verified":
+        return "bg-green-100 text-green-800";
+      case "pending":
+        return "bg-yellow-100 text-yellow-800";
+      case "rejected":
+        return "bg-red-100 text-red-800";
+      case "resubmission_required":
+        return "bg-orange-100 text-orange-800";
+      case "processing":
+        return "bg-blue-100 text-blue-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const getVerificationFeedbackReason = () => {
+    return (
+      currentStatus?.rejection_notes ||
+      currentStatus?.admin_review_notes ||
+      currentStatus?.verification_notes ||
+      null
+    );
   };
 
   return (
@@ -300,7 +351,7 @@ const NIDVerification: React.FC = () => {
         <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">
           Verify Yourself
         </h2>
-        <form onSubmit={handleSubmit}>
+        <form id="nidVerificationForm" onSubmit={handleSubmit}>
           <div className="mb-4">
             <label htmlFor="nidImage" className="block text-sm font-medium text-gray-700">
               Upload an image of the front part of your NID
@@ -320,7 +371,6 @@ const NIDVerification: React.FC = () => {
                 <li>- Keep all four corners visible.</li>
                 <li>- Avoid glare, shadows, and blur.</li>
                 <li>- Make sure all text is readable.</li>
-                <li>- Upload the original NID image, not a screenshot.</li>
               </ul>
             </div>
           </div>
@@ -412,6 +462,99 @@ const NIDVerification: React.FC = () => {
             </div>
           )}
 
+          <div className="mb-4">
+            {statusLoading ? (
+              <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                Loading verification status...
+              </div>
+            ) : (
+              isBackendStatusVisible &&
+              currentStatus && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">Verification Status</h3>
+                  <div className={`mt-2 p-3 rounded-md ${getStatusBadgeClasses(currentStatus.verification_status)}`}>
+                    <p className="text-sm font-medium flex items-center">
+                      {currentStatus.verification_status === "processing" && (
+                        <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      )}
+                      {getStatusLabel(currentStatus.verification_status)}
+                    </p>
+
+                    {currentStatus.verification_status === "verified" && currentStatus.verified_at && (
+                      <p className="text-xs mt-2 opacity-90">
+                        Verified on {new Date(currentStatus.verified_at).toLocaleString()}
+                      </p>
+                    )}
+
+                    {currentStatus.verification_status === "pending" && (
+                      <p className="text-xs mt-2 opacity-90">
+                        Your verification request has been submitted successfully. Please wait for admin approval.
+                      </p>
+                    )}
+
+                    {(currentStatus.verification_status === "rejected" || currentStatus.verification_status === "resubmission_required") && (
+                      <p className="text-xs mt-2 opacity-90">
+                        {currentStatus.verification_status === "rejected"
+                          ? "Your verification was rejected. Please resubmit with corrected information."
+                          : "Your verification requires resubmission. Please review the admin feedback and upload a new NID image."}
+                        {getVerificationFeedbackReason() && (
+                          <span className="block mt-1 font-medium">
+                            Reason: {getVerificationFeedbackReason()}
+                          </span>
+                        )}
+                      </p>
+                    )}
+
+                    {currentStatus.verification_status === "processing" && (
+                      <p className="text-xs mt-2 opacity-90">
+                        Your verification is currently being processed.
+                      </p>
+                    )}
+
+                    {(currentStatus.verification_status === "rejected" || currentStatus.verification_status === "resubmission_required") && (
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          onClick={handleUploadDifferentImage}
+                          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                        >
+                          Upload a Different NID Image
+                        </button>
+                        <button
+                          type="submit"
+                          form="nidVerificationForm"
+                          disabled={!canContinue || loading || status === "Submitting..."}
+                          className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+                        >
+                          Resubmit Verification
+                        </button>
+                      </div>
+                    )}
+
+                    {currentStatus.ocr_confirmed !== undefined && (
+                      <div className="mt-3 pt-3 border-t border-opacity-20 border-gray-500">
+                        <p className="text-xs opacity-75">
+                          OCR Confirmed: {currentStatus.ocr_confirmed ? "Yes" : "No"}
+                        </p>
+                      </div>
+                    )}
+
+                    {currentStatus.verification_notes && (
+                      <div className="mt-3 pt-3 border-t border-opacity-20 border-gray-500">
+                        <p className="text-xs opacity-75">
+                          Notes: {currentStatus.verification_notes}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            )}
+          </div>
+
           {canContinue && (
             <>
               <div className="mb-4">
@@ -434,80 +577,17 @@ const NIDVerification: React.FC = () => {
                 </div>
               )}
 
-              <div className="mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">Verification Status</h3>
-                <div className={`mt-2 p-3 rounded-md ${
-                  status === "Verified" ? "bg-green-100 text-green-800" : 
-                  status === "Verification Pending" ? "bg-yellow-100 text-yellow-800" :
-                  status === "Verification Rejected" ? "bg-red-100 text-red-800" :
-                  status === "Submitting..." ? "bg-blue-100 text-blue-800" :
-                  "bg-gray-100 text-gray-800"
-                }`}>
-                  <p className="text-sm font-medium flex items-center">
-                    {status === "Submitting..." && (
-                      <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                    )}
-                    {status === "Verified" && (
-                      <svg className="h-4 w-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                    {status === "Verification Pending" && (
-                      <svg className="h-4 w-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                    {status}
-                  </p>
-                  
-                  {status === "Not Submitted" && (
-                    <p className="text-xs mt-2 opacity-90">
-                      Please fill out the form and upload your NID image to submit for verification.
-                    </p>
-                  )}
-                  {status === "Verification Pending" && (
-                    <p className="text-xs mt-2 opacity-90">
-                      Your verification request has been submitted successfully. Please wait for admin approval.
-                    </p>
-                  )}
-                  {status === "Verified" && currentStatus?.verified_at && (
-                    <p className="text-xs mt-2 opacity-90">
-                      Verified on {new Date(currentStatus.verified_at).toLocaleString()}
-                    </p>
-                  )}
-                  {status === "Verification Rejected" && (
-                    <p className="text-xs mt-2 opacity-90">
-                      Your verification was rejected. Please resubmit with correct information.
-                      {currentStatus?.rejection_notes && (
-                        <span className="block mt-1 font-medium">
-                          Reason: {currentStatus.rejection_notes}
-                        </span>
-                      )}
-                    </p>
-                  )}
-                  
-                  {currentStatus?.verification_notes && (
-                    <div className="mt-3 pt-3 border-t border-opacity-20 border-gray-500">
-                      <p className="text-xs opacity-75">
-                        Notes: {currentStatus.verification_notes}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {status !== "Verified" ? (
+              {backendVerificationStatus !== "verified" &&
+              backendVerificationStatus !== "rejected" &&
+              backendVerificationStatus !== "resubmission_required" ? (
                 <button
                   type="submit"
                   className={`w-full py-2 px-4 rounded-md transition ${
-                    loading || status === "Submitting..." || status === "Verification Pending"
+                    loading || status === "Submitting..." || backendVerificationStatus === "pending" || backendVerificationStatus === "verified" || backendVerificationStatus === "processing"
                       ? "bg-gray-400 cursor-not-allowed" 
                       : "bg-indigo-600 hover:bg-indigo-700"
                   } text-white`}
-                  disabled={loading || status === "Submitting..." || status === "Verification Pending"}
+                  disabled={loading || status === "Submitting..." || backendVerificationStatus === "pending" || backendVerificationStatus === "verified" || backendVerificationStatus === "processing"}
                 >
                   {loading || status === "Submitting..." ? (
                     <span className="flex items-center justify-center">
@@ -517,9 +597,9 @@ const NIDVerification: React.FC = () => {
                       </svg>
                       Submitting...
                     </span>
-                  ) : status === "Verification Pending" ? (
+                  ) : backendVerificationStatus === "pending" ? (
                     "Request Submitted - Awaiting Admin Approval"
-                  ) : status === "Verification Rejected" ? (
+                  ) : backendVerificationStatus === "rejected" || backendVerificationStatus === "resubmission_required" ? (
                     "Resubmit Verification"
                   ) : (
                     "Submit Verification"

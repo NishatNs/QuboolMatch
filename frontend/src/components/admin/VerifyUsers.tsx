@@ -402,7 +402,7 @@ const VerifyUsers: React.FC = () => {
         </div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-x-auto">
-          <table className="min-w-[1250px] divide-y divide-gray-200">
+          <table className="min-w-[1100px] divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -419,9 +419,6 @@ const VerifyUsers: React.FC = () => {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Guardian Verified
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
                 </th>
               </tr>
             </thead>
@@ -507,14 +504,6 @@ const VerifyUsers: React.FC = () => {
                         {guardianProcessingUserId === user.id ? 'Processing...' : 'No'}
                       </button>
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                    <button
-                      onClick={() => openReviewDetails(user)}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-md text-sm"
-                    >
-                      Credential Comparison
-                    </button>
                   </td>
                 </tr>
               ))}

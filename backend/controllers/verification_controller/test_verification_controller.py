@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import Mock, patch
@@ -119,6 +121,71 @@ class TestVerificationController:
                 assert data["ocr_confirmed"] is True
             finally:
                 app.dependency_overrides.pop(get_current_user, None)
+                app.dependency_overrides.pop(get_db, None)
+
+    def test_get_pending_verifications_includes_comparison_fields(self):
+        """Test pending verifications return submitted, OCR, and comparison fields"""
+        with patch('controllers.verification_controller.verification_controller.get_current_admin_user') as mock_get_admin, \
+             patch('controllers.verification_controller.verification_controller.get_db') as mock_get_db:
+
+            mock_admin = Mock(spec=User)
+            mock_get_admin.return_value = mock_admin
+
+            user = Mock(spec=User)
+            user.id = "test-user-id"
+            user.name = "Test User"
+            user.email = "test@example.com"
+            user.age = 25
+            user.date_of_birth = None
+            user.nid = "1234567890123"
+            user.verification_status = "pending"
+            user.verification_notes = "Ready for verification"
+            user.guardian_verification_status = "not_submitted"
+            user.nid_image_data = b"image-bytes"
+            user.nid_image_filename = "nid.png"
+            user.created_at = datetime(2026, 6, 24, 10, 30, 0)
+            user.ocr_name = "Test User"
+            user.ocr_father_name = "Father Name"
+            user.ocr_mother_name = "Mother Name"
+            user.ocr_date_of_birth = None
+            user.ocr_nid_number = "1234567890123"
+            user.ocr_image_quality = "good"
+            user.ocr_warnings = '["minor glare"]'
+            user.ocr_confirmed = True
+            user.ocr_processed_at = datetime(2026, 6, 24, 11, 0, 0)
+            user.ocr_name_match_score = 1.0
+            user.ocr_name_match_status = "matched"
+            user.ocr_nid_match = True
+            user.ocr_dob_match = None
+            user.ocr_review_status = "pending_review"
+            user.admin_review_notes = None
+
+            mock_db = Mock()
+            mock_query = Mock()
+            mock_query.filter.return_value.all.return_value = [user]
+            mock_db.query.return_value = mock_query
+            mock_get_db.return_value = mock_db
+            app.dependency_overrides[get_current_admin_user] = lambda: mock_admin
+            app.dependency_overrides[get_db] = lambda: mock_db
+
+            try:
+                response = client.get("/verification/pending")
+
+                assert response.status_code == 200
+                data = response.json()
+                assert len(data["pending_verifications"]) == 1
+                pending_user = data["pending_verifications"][0]
+                assert pending_user["name"] == "Test User"
+                assert pending_user["age"] == 25
+                assert pending_user["nid"] == "1234567890123"
+                assert pending_user["ocr_name"] == "Test User"
+                assert pending_user["ocr_name_match_status"] == "matched"
+                assert pending_user["ocr_nid_match"] is True
+                assert pending_user["ocr_nid_masked"] == "*********0123"
+                assert pending_user["ocr_review_status"] == "pending_review"
+                assert pending_user["ocr_warnings"] == ["minor glare"]
+            finally:
+                app.dependency_overrides.pop(get_current_admin_user, None)
                 app.dependency_overrides.pop(get_db, None)
 
     def test_reject_verification_keeps_user_notes_separate(self):
