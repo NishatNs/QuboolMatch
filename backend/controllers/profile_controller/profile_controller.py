@@ -86,6 +86,24 @@ def process_base64_file(base64_data: str) -> tuple:
         return None, None, None
 
 
+def _build_profile_response(profile, user: User) -> dict:
+    profile_dict = profile.to_dict()
+    official_age = _optional_int(getattr(user, "age", None))
+
+    return {
+        **profile_dict,
+        "name": _optional_string(getattr(user, "name", None)) or profile_dict.get("name"),
+        "age": official_age if official_age is not None else profile_dict.get("age"),
+        "date_of_birth": _optional_isoformat(getattr(user, "date_of_birth", None)) or profile_dict.get("date_of_birth"),
+        "gender": user.gender,
+        "religion": user.religion,
+        "father_name": _optional_string(getattr(user, "father_name", None)) or profile_dict.get("father_name"),
+        "mother_name": _optional_string(getattr(user, "mother_name", None)) or profile_dict.get("mother_name"),
+        "identity_verified": bool(getattr(user, "identity_verified", False)),
+        "verification_status": user.verification_status,
+    }
+
+
 class ProfileCreate(BaseModel):
     # Basic user information
     name: Optional[str] = None
@@ -194,6 +212,10 @@ async def create_profile(
         gender = profile_dict.pop("gender", None)
         religion = profile_dict.pop("religion", None)
         # genetic_conditions and necessary_preferences are already strings from frontend
+
+        if user.identity_verified:
+            for field_name in ("name", "age", "date_of_birth", "gender", "father_name", "mother_name"):
+                profile_dict.pop(field_name, None)
         
         # Process base64 files
         if profile_dict.get('profile_picture'):
@@ -217,16 +239,17 @@ async def create_profile(
                 profile_dict['medical_documents_filename'] = filename
                 profile_dict['medical_documents_content_type'] = content_type
         
-        if name is not None:
-            user.name = name
-        if age is not None:
-            user.age = age
-        if date_of_birth:
-            user.date_of_birth = datetime.strptime(date_of_birth, "%Y-%m-%d").date()
-        if gender is not None:
-            user.gender = gender
-        if religion is not None:
-            user.religion = religion
+        if not user.identity_verified:
+            if name is not None:
+                user.name = name
+            if age is not None:
+                user.age = age
+            if date_of_birth:
+                user.date_of_birth = datetime.strptime(date_of_birth, "%Y-%m-%d").date()
+            if gender is not None:
+                user.gender = gender
+            if religion is not None:
+                user.religion = religion
 
         # Create profile
         profile = ProfileRepository.create(db, user_id, **profile_dict)
@@ -234,14 +257,7 @@ async def create_profile(
         return JSONResponse(
             content={
                 "message": "Profile created successfully",
-                "profile": {
-                    **profile.to_dict(),
-                    "name": user.name,
-                    "age": user.age,
-                    "date_of_birth": user.date_of_birth.isoformat() if user.date_of_birth else None,
-                    "gender": user.gender,
-                    "religion": user.religion,
-                }
+                "profile": _build_profile_response(profile, user)
             },
             status_code=201
         )
@@ -269,17 +285,7 @@ async def get_profile(
         if not profile:
             raise HTTPException(status_code=404, detail="Profile not found")
         
-        return JSONResponse(
-            content={
-                **profile.to_dict(),
-                "name": user.name,
-                "age": user.age,
-                "date_of_birth": user.date_of_birth.isoformat() if user.date_of_birth else None,
-                "gender": user.gender,
-                "religion": user.religion,
-            },
-            status_code=200
-        )
+        return JSONResponse(content=_build_profile_response(profile, user), status_code=200)
     except HTTPException:
         raise
     except Exception as e:
@@ -313,6 +319,10 @@ async def update_profile(
         gender = profile_dict.pop("gender", None)
         religion = profile_dict.pop("religion", None)
         # genetic_conditions and necessary_preferences are already strings from frontend
+
+        if user.identity_verified:
+            for field_name in ("name", "age", "date_of_birth", "gender", "father_name", "mother_name"):
+                profile_dict.pop(field_name, None)
         
         # Process base64 files
         if 'profile_picture' in profile_dict and profile_dict['profile_picture']:
@@ -336,16 +346,17 @@ async def update_profile(
                 profile_dict['medical_documents_filename'] = filename
                 profile_dict['medical_documents_content_type'] = content_type
         
-        if name is not None:
-            user.name = name
-        if age is not None:
-            user.age = age
-        if date_of_birth is not None:
-            user.date_of_birth = datetime.strptime(date_of_birth, "%Y-%m-%d").date() if date_of_birth else None
-        if gender is not None:
-            user.gender = gender
-        if religion is not None:
-            user.religion = religion
+        if not user.identity_verified:
+            if name is not None:
+                user.name = name
+            if age is not None:
+                user.age = age
+            if date_of_birth is not None:
+                user.date_of_birth = datetime.strptime(date_of_birth, "%Y-%m-%d").date() if date_of_birth else None
+            if gender is not None:
+                user.gender = gender
+            if religion is not None:
+                user.religion = religion
 
         # Update profile
         updated_profile = ProfileRepository.update(db, profile, **profile_dict)
@@ -353,14 +364,7 @@ async def update_profile(
         return JSONResponse(
             content={
                 "message": "Profile updated successfully",
-                "profile": {
-                    **updated_profile.to_dict(),
-                    "name": user.name,
-                    "age": user.age,
-                    "date_of_birth": user.date_of_birth.isoformat() if user.date_of_birth else None,
-                    "gender": user.gender,
-                    "religion": user.religion,
-                }
+                "profile": _build_profile_response(updated_profile, user)
             },
             status_code=200
         )
@@ -425,11 +429,12 @@ async def get_profile_by_user_id(
     """Get a specific user's profile by user ID"""
     try:
         profile = ProfileRepository.get_by_user_id(db, user_id)
+        user = db.query(User).filter(User.id == user_id).first()
         
-        if not profile:
+        if not profile or not user:
             raise HTTPException(status_code=404, detail="Profile not found")
         
-        return JSONResponse(content=profile.to_dict(), status_code=200)
+        return JSONResponse(content=_build_profile_response(profile, user), status_code=200)
     except HTTPException:
         raise
     except Exception as e:

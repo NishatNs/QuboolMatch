@@ -1,6 +1,6 @@
 import uuid
 import bcrypt
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 
 from sqlalchemy import Column, String, Boolean, Date, DateTime, Text, LargeBinary, Integer, Float, JSON
@@ -20,6 +20,8 @@ class User(Base):
     nid = Column(String, nullable=False, unique=True)  # National ID number
     age = Column(Integer, nullable=False)
     date_of_birth = Column(Date, nullable=True)
+    father_name = Column(String, nullable=True)
+    mother_name = Column(String, nullable=True)
     religion = Column(String, nullable=True)
     
     # Preferred age range for matching
@@ -28,6 +30,7 @@ class User(Base):
     
     # System fields
     is_admin = Column(Boolean, default=False, nullable=False)
+    identity_verified = Column(Boolean, default=False, nullable=False)
     is_deleted = Column(Boolean, default=False)
     is_archived = Column(Boolean, default=False)
     created_at = Column(DateTime, default=lambda: datetime.now(
@@ -69,10 +72,13 @@ class User(Base):
         self.gender = gender
         self.nid = nid
         self.age = age
+        self.father_name = None
+        self.mother_name = None
         self.religion = religion
         self.preferred_age_from = preferred_age_from
         self.preferred_age_to = preferred_age_to
         self.is_admin = is_admin
+        self.identity_verified = False
         self.is_deleted = False
         self.is_archived = False
         self.verification_status = "not_submitted"
@@ -149,10 +155,36 @@ class User(Base):
     def verify(self):
         self.verification_status = "verified"
         self.verified_at = datetime.now(timezone.utc)
+        self.identity_verified = True
         return self
 
     def reject_verification(self, notes: str = None):
         self.verification_status = "rejected"
+        self.identity_verified = False
+        return self
+
+    def set_official_identity(
+        self,
+        *,
+        name: Optional[str] = None,
+        nid: Optional[str] = None,
+        date_of_birth: Optional[date] = None,
+        age: Optional[int] = None,
+        father_name: Optional[str] = None,
+        mother_name: Optional[str] = None,
+    ):
+        if name is not None:
+            self.name = name
+        if nid is not None:
+            self.nid = nid
+        if date_of_birth is not None:
+            self.date_of_birth = date_of_birth
+        if age is not None:
+            self.age = age
+        if father_name is not None:
+            self.father_name = father_name
+        if mother_name is not None:
+            self.mother_name = mother_name
         return self
 
     def verify_guardian(self):

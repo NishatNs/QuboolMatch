@@ -66,7 +66,7 @@ const NIDVerification: React.FC = () => {
   const backendVerificationStatus = currentStatus?.verification_status ?? null;
   const isBackendStatusVisible = Boolean(
     backendVerificationStatus &&
-      ["pending", "verified", "rejected", "resubmission_required", "processing"].includes(backendVerificationStatus)
+      ["pending", "verified", "rejected", "resubmission_required", "correction_required", "processing"].includes(backendVerificationStatus)
   );
   const canContinue =
     ocrStatus === "success" &&
@@ -286,6 +286,8 @@ const NIDVerification: React.FC = () => {
         return "Verification Rejected";
       case "resubmission_required":
         return "Resubmission Required";
+      case "correction_required":
+        return "Correction Required";
       case "processing":
         return "Processing";
       default:
@@ -302,6 +304,8 @@ const NIDVerification: React.FC = () => {
       case "rejected":
         return "bg-red-100 text-red-800";
       case "resubmission_required":
+        return "bg-orange-100 text-orange-800";
+      case "correction_required":
         return "bg-orange-100 text-orange-800";
       case "processing":
         return "bg-blue-100 text-blue-800";
@@ -515,11 +519,13 @@ const NIDVerification: React.FC = () => {
                       </p>
                     )}
 
-                    {(currentStatus.verification_status === "rejected" || currentStatus.verification_status === "resubmission_required") && (
+                    {(currentStatus.verification_status === "rejected" || currentStatus.verification_status === "resubmission_required" || currentStatus.verification_status === "correction_required") && (
                       <p className="text-xs mt-2 opacity-90">
                         {currentStatus.verification_status === "rejected"
                           ? "Your verification was rejected. Please resubmit with corrected information."
-                          : "Your verification requires resubmission. Please review the admin feedback and upload a new NID image."}
+                          : currentStatus.verification_status === "correction_required"
+                            ? "Your verification requires corrections. Please review the admin feedback and update your information."
+                            : "Your verification requires resubmission. Please review the admin feedback and upload a new NID image."}
                         {getVerificationFeedbackReason() && (
                           <span className="block mt-1 font-medium">
                             Reason: {getVerificationFeedbackReason()}
@@ -534,7 +540,7 @@ const NIDVerification: React.FC = () => {
                       </p>
                     )}
 
-                    {(currentStatus.verification_status === "rejected" || currentStatus.verification_status === "resubmission_required") && (
+                    {(currentStatus.verification_status === "rejected" || currentStatus.verification_status === "resubmission_required" || currentStatus.verification_status === "correction_required") && (
                       <div className="mt-4 flex flex-wrap gap-3">
                         <button
                           type="button"
@@ -551,14 +557,6 @@ const NIDVerification: React.FC = () => {
                         >
                           Resubmit Verification
                         </button>
-                      </div>
-                    )}
-
-                    {currentStatus.ocr_confirmed !== undefined && (
-                      <div className="mt-3 pt-3 border-t border-opacity-20 border-gray-500">
-                        <p className="text-xs opacity-75">
-                          OCR Confirmed: {currentStatus.ocr_confirmed ? "Yes" : "No"}
-                        </p>
                       </div>
                     )}
 
@@ -619,7 +617,7 @@ const NIDVerification: React.FC = () => {
                     </span>
                   ) : backendVerificationStatus === "pending" ? (
                     "Request Submitted - Awaiting Admin Approval"
-                  ) : backendVerificationStatus === "rejected" || backendVerificationStatus === "resubmission_required" ? (
+                    ) : backendVerificationStatus === "rejected" || backendVerificationStatus === "resubmission_required" || backendVerificationStatus === "correction_required" ? (
                     "Resubmit Verification"
                   ) : (
                     "Submit Verification"

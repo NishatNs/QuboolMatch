@@ -16,6 +16,7 @@ interface ProfileData {
   name: string;
   age: string;
   dateOfBirth: string;
+  identityVerified: boolean;
   gender: string;
   location: string;
   fatherName: string;
@@ -255,6 +256,7 @@ const ProfilePage: React.FC = () => {
     name: "",
     age: "",
     dateOfBirth: "",
+    identityVerified: false,
     gender: "",
     location: "",
     fatherName: "",
@@ -333,6 +335,11 @@ const ProfilePage: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement> | { target: { name: string; value: any; type?: string; checked?: boolean } }) => {
     const { name, value, type } = e.target as HTMLInputElement & { type?: string };
     const checked = (e.target as HTMLInputElement).checked;
+    const lockedIdentityFields = new Set(["name", "age", "dateOfBirth", "fatherName", "motherName"]);
+
+    if (profile.identityVerified && lockedIdentityFields.has(name)) {
+      return;
+    }
 
     if (name === 'guardianRelation') {
       setProfile((prev) => ({
@@ -633,6 +640,7 @@ const ProfilePage: React.FC = () => {
             name: data.name || '',
             age: data.age || '',
             dateOfBirth: data.date_of_birth || '',
+            identityVerified: data.identity_verified || false,
             gender: data.gender || '',
             location: data.location || '',
             fatherName: data.father_name || data.guardian_name || '',
@@ -780,6 +788,8 @@ const ProfileHeader: React.FC<{
   onInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   onProfilePictureChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }> = ({ profile, onInputChange, onProfilePictureChange }) => {
+  const identityLocked = profile.identityVerified;
+
   return (
     <div className="flex flex-col md:flex-row items-center md:items-start md:justify-between mb-6">
       <div className="flex items-center space-x-4">
@@ -813,7 +823,8 @@ const ProfileHeader: React.FC<{
             name="name"
             value={profile.name}
             onChange={onInputChange}
-            className="text-lg font-bold text-gray-800 bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 w-full"
+            readOnly={identityLocked}
+            className={`text-lg font-bold text-gray-800 bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 w-full ${identityLocked ? "bg-gray-50 cursor-not-allowed" : ""}`}
             placeholder="Enter your name"
           />
           <div className="mt-4">
@@ -823,7 +834,8 @@ const ProfileHeader: React.FC<{
               name="age"
               value={profile.age}
               onChange={onInputChange}
-              className="bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 w-full"
+              readOnly={identityLocked}
+              className={`bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 w-full ${identityLocked ? "bg-gray-50 cursor-not-allowed" : ""}`}
               placeholder="Enter your age"
             />
           </div>
@@ -834,7 +846,8 @@ const ProfileHeader: React.FC<{
               name="dateOfBirth"
               value={profile.dateOfBirth}
               onChange={onInputChange}
-              className="bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 w-full"
+              readOnly={identityLocked}
+              className={`bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 w-full ${identityLocked ? "bg-gray-50 cursor-not-allowed" : ""}`}
             />
           </div>
           <div className="mt-4">
@@ -858,7 +871,8 @@ const ProfileHeader: React.FC<{
               name="fatherName"
               value={profile.fatherName}
               onChange={onInputChange}
-              className="bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 w-full"
+              readOnly={identityLocked}
+              className={`bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 w-full ${identityLocked ? "bg-gray-50 cursor-not-allowed" : ""}`}
               placeholder="Enter father's name"
             />
           </div>
@@ -869,10 +883,16 @@ const ProfileHeader: React.FC<{
               name="motherName"
               value={profile.motherName}
               onChange={onInputChange}
-              className="bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 w-full"
+              readOnly={identityLocked}
+              className={`bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 w-full ${identityLocked ? "bg-gray-50 cursor-not-allowed" : ""}`}
               placeholder="Enter mother's name"
             />
           </div>
+          {identityLocked && (
+            <p className="mt-3 text-xs text-gray-500">
+              Verified identity fields are locked and cannot be edited.
+            </p>
+          )}
           <div className="mt-4">
             <label className="block text-sm font-medium text-gray-700">Guardian Name ( For Verification)</label>
             <input

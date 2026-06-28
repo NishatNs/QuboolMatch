@@ -75,6 +75,15 @@ const VerifyUsers: React.FC = () => {
     }
   };
 
+  const readErrorMessage = async (response: Response, fallback: string) => {
+    try {
+      const payload = await response.json();
+      return payload?.detail || payload?.message || fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
   const handleVerifyUser = async (userId: string) => {
     setProcessingUserId(userId);
     try {
@@ -88,7 +97,7 @@ const VerifyUsers: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to verify user');
+        throw new Error(await readErrorMessage(response, 'Failed to verify user'));
       }
 
       // Remove the user from pending list
@@ -124,7 +133,7 @@ const VerifyUsers: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to reject user');
+        throw new Error(await readErrorMessage(response, 'Failed to reject user'));
       }
 
       // Remove the user from pending list
@@ -154,7 +163,7 @@ const VerifyUsers: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to approve guardian verification');
+        throw new Error(await readErrorMessage(response, 'Failed to approve guardian verification'));
       }
 
       setPendingUsers(prev => prev.map(user =>
@@ -182,7 +191,7 @@ const VerifyUsers: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to reject guardian verification');
+        throw new Error(await readErrorMessage(response, 'Failed to reject guardian verification'));
       }
 
       setPendingUsers(prev => prev.map(user =>

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models.user.user import User
 from models.verification_rejection import VerificationRejection
+from repositories.profile_repository.profile_repository import ProfileRepository
 from shared.token import get_current_user, get_current_admin_user
 from pydantic import BaseModel, Field
 import base64
@@ -33,6 +34,9 @@ class VerificationStatusResponse(BaseModel):
     age: Optional[int] = None
     date_of_birth: Optional[str] = None
     nid: Optional[str] = None
+    father_name: Optional[str] = None
+    mother_name: Optional[str] = None
+    identity_verified: bool = False
     verified_at: Optional[str] = None
     verification_notes: Optional[str] = None
     rejection_notes: Optional[str] = None
@@ -64,6 +68,9 @@ class PendingVerificationUserResponse(BaseModel):
     age: Optional[int] = None
     date_of_birth: Optional[str] = None
     nid: Optional[str] = None
+    father_name: Optional[str] = None
+    mother_name: Optional[str] = None
+    identity_verified: bool = False
     verification_status: str
     verification_notes: Optional[str] = None
     guardian_verification_status: str
@@ -100,6 +107,23 @@ class OcrConfirmationUpdateResponse(BaseModel):
     success: bool
     message: str
     ocr_confirmed: bool
+
+
+class AdminVerificationCorrectionRequest(BaseModel):
+    reason: str = Field(min_length=1)
+
+
+class CorrectSubmittedIdentityRequest(BaseModel):
+    name: str = Field(min_length=1)
+    nid: str = Field(min_length=1)
+    age: Optional[int] = None
+    date_of_birth: Optional[str] = None
+
+
+class SimpleVerificationActionResponse(BaseModel):
+    success: bool
+    message: str
+    verification_status: str
 
 
 class NIDOcrExtractionResponse(BaseModel):
@@ -176,7 +200,59 @@ def _normalize_ocr_warnings(value) -> Optional[list[str]]:
             return [parsed.strip()]
         return None
 
-    return [str(value).strip()] if str(value).strip() else None
+    return None
+
+
+def _normalize_nid_value(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+
+    digits_only = "".join(char for char in value if char.isdigit())
+    return digits_only or None
+
+
+def _is_valid_nid(value: Optional[str]) -> bool:
+    normalized = _normalize_nid_value(value)
+    return bool(normalized) and len(normalized) in {10, 13, 17}
+
+
+def _calculate_age_from_date_of_birth(date_of_birth: date) -> int:
+    today = date.today()
+    return today.year - date_of_birth.year - (
+        (today.month, today.day) < (date_of_birth.month, date_of_birth.day)
+    )
+
+
+def _parse_user_date_of_birth(value: Optional[str]) -> Optional[date]:
+    if not value:
+        return None
+
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="date_of_birth must use YYYY-MM-DD format")
+
+
+def _optional_string(value) -> Optional[str]:
+    return value if isinstance(value, str) else None
+
+
+def _optional_int(value) -> Optional[int]:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _optional_float(value) -> Optional[float]:
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
+def _optional_bool(value) -> Optional[bool]:
+    return value if isinstance(value, bool) else None
+
+
+def _optional_isoformat(value) -> Optional[str]:
+    if not isinstance(value, (date, datetime)):
+        return None
+    return value.isoformat()
 
 
 def _normalize_text_for_comparison(value: Optional[str]) -> str:
@@ -262,24 +338,34 @@ def _derive_dob_match(
 
 
 def _build_comparison_payload(user: User) -> dict[str, object]:
-    ocr_date_of_birth = user.ocr_date_of_birth.isoformat() if user.ocr_date_of_birth else None
-    ocr_name_match_score = user.ocr_name_match_score
+    submitted_name = _optional_string(getattr(user, "name", None))
+    submitted_nid = _optional_string(getattr(user, "nid", None))
+    submitted_date_of_birth = getattr(user, "date_of_birth", None) if isinstance(getattr(user, "date_of_birth", None), date) else None
+    submitted_age = _optional_int(getattr(user, "age", None))
+    ocr_name = _optional_string(getattr(user, "ocr_name", None))
+    ocr_nid_number = _optional_string(getattr(user, "ocr_nid_number", None))
+    ocr_date_of_birth_obj = getattr(user, "ocr_date_of_birth", None) if isinstance(getattr(user, "ocr_date_of_birth", None), date) else None
+    ocr_date_of_birth = _optional_isoformat(ocr_date_of_birth_obj)
+
+    ocr_name_match_score = _optional_float(getattr(user, "ocr_name_match_score", None))
     if ocr_name_match_score is None:
-        ocr_name_match_score = _compute_name_match_score(user.name, user.ocr_name)
+        ocr_name_match_score = _compute_name_match_score(submitted_name, ocr_name)
 
-    ocr_name_match_status = user.ocr_name_match_status
+    ocr_name_match_status = _optional_string(getattr(user, "ocr_name_match_status", None))
     if ocr_name_match_status is None:
-        ocr_name_match_status = _derive_name_match_status(user.name, user.ocr_name, ocr_name_match_score)
+        ocr_name_match_status = _derive_name_match_status(submitted_name, ocr_name, ocr_name_match_score)
 
-    ocr_nid_match = user.ocr_nid_match
+    ocr_nid_match = _optional_bool(getattr(user, "ocr_nid_match", None))
     if ocr_nid_match is None:
-        ocr_nid_match = _derive_nid_match(user.nid, user.ocr_nid_number)
+        ocr_nid_match = _derive_nid_match(submitted_nid, ocr_nid_number)
 
-    ocr_dob_match = user.ocr_dob_match
+    ocr_dob_match = _optional_bool(getattr(user, "ocr_dob_match", None))
     if ocr_dob_match is None:
-        ocr_dob_match = _derive_dob_match(user.date_of_birth, user.age, user.ocr_date_of_birth)
+        ocr_dob_match = _derive_dob_match(submitted_date_of_birth, submitted_age, ocr_date_of_birth_obj)
 
-    ocr_review_status = user.ocr_review_status or ("pending_review" if user.ocr_processed_at else None)
+    ocr_review_status = _optional_string(getattr(user, "ocr_review_status", None)) or (
+        "pending_review" if getattr(user, "ocr_processed_at", None) else None
+    )
 
     return {
         "ocr_name_match_score": ocr_name_match_score,
@@ -287,9 +373,9 @@ def _build_comparison_payload(user: User) -> dict[str, object]:
         "ocr_nid_match": ocr_nid_match,
         "ocr_dob_match": ocr_dob_match,
         "ocr_review_status": ocr_review_status,
-        "admin_review_notes": user.admin_review_notes,
+        "admin_review_notes": _optional_string(getattr(user, "admin_review_notes", None)),
         "ocr_date_of_birth": ocr_date_of_birth,
-        "ocr_nid_masked": _format_nid_masked(user.ocr_nid_number),
+        "ocr_nid_masked": _format_nid_masked(ocr_nid_number),
     }
 
 
@@ -297,27 +383,30 @@ def _build_pending_user_response(user: User) -> PendingVerificationUserResponse:
     comparison_payload = _build_comparison_payload(user)
     return PendingVerificationUserResponse(
         id=user.id,
-        name=user.name,
-        email=user.email,
-        age=user.age,
-        date_of_birth=user.date_of_birth.isoformat() if user.date_of_birth else None,
-        nid=user.nid,
-        verification_status=user.verification_status,
-        verification_notes=user.verification_notes,
-        guardian_verification_status=user.guardian_verification_status,
-        has_nid_image=bool(user.nid_image_data),
-        nid_image_filename=user.nid_image_filename,
-        created_at=user.created_at.isoformat(),
-        ocr_name=user.ocr_name,
-        ocr_father_name=user.ocr_father_name,
-        ocr_mother_name=user.ocr_mother_name,
+        name=_optional_string(getattr(user, "name", None)),
+        email=_optional_string(getattr(user, "email", None)) or "",
+        age=_optional_int(getattr(user, "age", None)),
+        date_of_birth=_optional_isoformat(getattr(user, "date_of_birth", None)),
+        nid=_format_nid_masked(_optional_string(getattr(user, "nid", None))),
+        father_name=_optional_string(getattr(user, "father_name", None)),
+        mother_name=_optional_string(getattr(user, "mother_name", None)),
+        identity_verified=_optional_bool(getattr(user, "identity_verified", False)) or False,
+        verification_status=_optional_string(getattr(user, "verification_status", None)) or "",
+        verification_notes=_optional_string(getattr(user, "verification_notes", None)),
+        guardian_verification_status=_optional_string(getattr(user, "guardian_verification_status", None)) or "",
+        has_nid_image=isinstance(getattr(user, "nid_image_data", None), (bytes, bytearray)),
+        nid_image_filename=_optional_string(getattr(user, "nid_image_filename", None)),
+        created_at=_optional_isoformat(getattr(user, "created_at", None)) or "",
+        ocr_name=_optional_string(getattr(user, "ocr_name", None)),
+        ocr_father_name=_optional_string(getattr(user, "ocr_father_name", None)),
+        ocr_mother_name=_optional_string(getattr(user, "ocr_mother_name", None)),
         ocr_date_of_birth=comparison_payload["ocr_date_of_birth"],
-        ocr_nid_number=user.ocr_nid_number,
+        ocr_nid_number=_optional_string(getattr(user, "ocr_nid_number", None)),
         ocr_nid_masked=comparison_payload["ocr_nid_masked"],
-        ocr_image_quality=user.ocr_image_quality,
-        ocr_warnings=_normalize_ocr_warnings(user.ocr_warnings) or [],
-        ocr_confirmed=bool(user.ocr_confirmed),
-        ocr_processed_at=user.ocr_processed_at.isoformat() if user.ocr_processed_at else None,
+        ocr_image_quality=_optional_string(getattr(user, "ocr_image_quality", None)),
+        ocr_warnings=_normalize_ocr_warnings(getattr(user, "ocr_warnings", None)) or [],
+        ocr_confirmed=_optional_bool(getattr(user, "ocr_confirmed", False)) or False,
+        ocr_processed_at=_optional_isoformat(getattr(user, "ocr_processed_at", None)),
         ocr_name_match_score=comparison_payload["ocr_name_match_score"],
         ocr_name_match_status=comparison_payload["ocr_name_match_status"],
         ocr_nid_match=comparison_payload["ocr_nid_match"],
@@ -325,6 +414,80 @@ def _build_pending_user_response(user: User) -> PendingVerificationUserResponse:
         ocr_review_status=comparison_payload["ocr_review_status"],
         admin_review_notes=comparison_payload["admin_review_notes"],
     )
+
+
+def _build_status_response(user: User, rejection_notes: Optional[str]) -> VerificationStatusResponse:
+    comparison_payload = _build_comparison_payload(user)
+    return VerificationStatusResponse(
+        verification_status=_optional_string(getattr(user, "verification_status", None)) or "",
+        name=_optional_string(getattr(user, "name", None)),
+        age=_optional_int(getattr(user, "age", None)),
+        date_of_birth=_optional_isoformat(getattr(user, "date_of_birth", None)),
+        nid=_format_nid_masked(_optional_string(getattr(user, "nid", None))),
+        father_name=_optional_string(getattr(user, "father_name", None)),
+        mother_name=_optional_string(getattr(user, "mother_name", None)),
+        identity_verified=_optional_bool(getattr(user, "identity_verified", False)) or False,
+        verified_at=_optional_isoformat(getattr(user, "verified_at", None)),
+        verification_notes=_optional_string(getattr(user, "verification_notes", None)),
+        rejection_notes=rejection_notes,
+        ocr_name=_optional_string(getattr(user, "ocr_name", None)),
+        ocr_father_name=_optional_string(getattr(user, "ocr_father_name", None)),
+        ocr_mother_name=_optional_string(getattr(user, "ocr_mother_name", None)),
+        ocr_date_of_birth=comparison_payload["ocr_date_of_birth"],
+        ocr_nid_number=_optional_string(getattr(user, "ocr_nid_number", None)),
+        ocr_nid_masked=comparison_payload["ocr_nid_masked"],
+        ocr_image_quality=_optional_string(getattr(user, "ocr_image_quality", None)),
+        ocr_warnings=_normalize_ocr_warnings(getattr(user, "ocr_warnings", None)) or [],
+        ocr_confirmed=_optional_bool(getattr(user, "ocr_confirmed", False)) or False,
+        ocr_processed_at=_optional_isoformat(getattr(user, "ocr_processed_at", None)),
+        ocr_name_match_score=comparison_payload["ocr_name_match_score"],
+        ocr_name_match_status=comparison_payload["ocr_name_match_status"],
+        ocr_nid_match=comparison_payload["ocr_nid_match"],
+        ocr_dob_match=comparison_payload["ocr_dob_match"],
+        ocr_review_status=comparison_payload["ocr_review_status"],
+        admin_review_notes=comparison_payload["admin_review_notes"],
+        has_nid_image=isinstance(getattr(user, "nid_image_data", None), (bytes, bytearray)),
+        nid_image_filename=_optional_string(getattr(user, "nid_image_filename", None)),
+    )
+
+
+def _update_verified_identity_from_ocr(user: User) -> None:
+    ocr_nid = _normalize_nid_value(getattr(user, "ocr_nid_number", None))
+    official_nid = _normalize_nid_value(getattr(user, "nid", None))
+    normalized_nid = ocr_nid if ocr_nid and _is_valid_nid(ocr_nid) else official_nid
+    if not normalized_nid or not _is_valid_nid(normalized_nid):
+        raise HTTPException(
+            status_code=400,
+            detail="A valid NID number is required before approval",
+        )
+
+    name = _optional_string(getattr(user, "ocr_name", None)) or _optional_string(getattr(user, "name", None))
+    father_name = _optional_string(getattr(user, "ocr_father_name", None)) or _optional_string(getattr(user, "father_name", None))
+    mother_name = _optional_string(getattr(user, "ocr_mother_name", None)) or _optional_string(getattr(user, "mother_name", None))
+
+    ocr_date_of_birth = getattr(user, "ocr_date_of_birth", None)
+    official_date_of_birth = getattr(user, "date_of_birth", None)
+    chosen_date_of_birth = ocr_date_of_birth if isinstance(ocr_date_of_birth, date) else official_date_of_birth
+    chosen_age = _calculate_age_from_date_of_birth(chosen_date_of_birth) if isinstance(chosen_date_of_birth, date) else _optional_int(getattr(user, "age", None))
+
+    user.set_official_identity(
+        name=name,
+        nid=normalized_nid,
+        date_of_birth=chosen_date_of_birth if isinstance(chosen_date_of_birth, date) else None,
+        age=chosen_age,
+        father_name=father_name,
+        mother_name=mother_name,
+    )
+    user.verify()
+    user.ocr_review_status = "approved"
+
+
+def _clear_comparison_fields(user: User) -> None:
+    user.ocr_name_match_score = None
+    user.ocr_name_match_status = None
+    user.ocr_nid_match = None
+    user.ocr_dob_match = None
+    user.ocr_review_status = None
 
 
 @router.post("/extract-nid", response_model=NIDOcrExtractionResponse)
@@ -483,38 +646,7 @@ async def get_verification_status(
     rejection = db.query(VerificationRejection).filter(
         VerificationRejection.user_id == current_user.id
     ).first()
-
-    comparison_payload = _build_comparison_payload(current_user)
-
-    return VerificationStatusResponse(
-        verification_status=current_user.verification_status,
-        name=current_user.name,
-        age=current_user.age,
-        date_of_birth=current_user.date_of_birth.isoformat() if current_user.date_of_birth else None,
-        nid=current_user.nid,
-        verified_at=current_user.verified_at.isoformat() if current_user.verified_at else None,
-        verification_notes=current_user.verification_notes,
-        rejection_notes=rejection.notes if rejection else None,
-        ocr_name=current_user.ocr_name,
-        ocr_father_name=current_user.ocr_father_name,
-        ocr_mother_name=current_user.ocr_mother_name,
-        ocr_date_of_birth=current_user.ocr_date_of_birth.isoformat() if current_user.ocr_date_of_birth else None,
-        ocr_nid_number=current_user.ocr_nid_number,
-        ocr_nid_masked=comparison_payload["ocr_nid_masked"],
-        ocr_blood_group=getattr(current_user, "ocr_blood_group", None),
-        ocr_image_quality=current_user.ocr_image_quality,
-        ocr_warnings=_normalize_ocr_warnings(current_user.ocr_warnings) or [],
-        ocr_confirmed=bool(current_user.ocr_confirmed),
-        ocr_processed_at=current_user.ocr_processed_at.isoformat() if current_user.ocr_processed_at else None,
-        ocr_name_match_score=comparison_payload["ocr_name_match_score"],
-        ocr_name_match_status=comparison_payload["ocr_name_match_status"],
-        ocr_nid_match=comparison_payload["ocr_nid_match"],
-        ocr_dob_match=comparison_payload["ocr_dob_match"],
-        ocr_review_status=comparison_payload["ocr_review_status"],
-        admin_review_notes=comparison_payload["admin_review_notes"],
-        has_nid_image=bool(current_user.nid_image_data),
-        nid_image_filename=current_user.nid_image_filename,
-    )
+    return _build_status_response(current_user, rejection.notes if rejection else None)
 
 
 @router.put("/ocr-confirmation", response_model=OcrConfirmationUpdateResponse)
@@ -593,9 +725,10 @@ async def get_verification_image_base64(
         "filename": current_user.nid_image_filename
     }
 
-@router.post("/approve/{user_id}")
+@router.post("/approve/{user_id}", response_model=SimpleVerificationActionResponse)
 async def approve_verification(
     user_id: str,
+    admin_review_notes: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_admin: User = Depends(get_current_admin_user)
 ):
@@ -605,16 +738,36 @@ async def approve_verification(
     user = db.query(User).filter(User.id == user_id, User.is_deleted == False).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    user.verify()
-    db.query(VerificationRejection).filter(
-        VerificationRejection.user_id == user_id
-    ).delete()
-    db.commit()
-    
-    return {"success": True, "message": "User verification approved"}
 
-@router.post("/reject/{user_id}")
+    try:
+        _update_verified_identity_from_ocr(user)
+        profile = ProfileRepository.get_by_user_id(db, user_id)
+        if profile:
+            profile.identity_verified = True
+            profile.date_of_birth = user.date_of_birth
+            profile.father_name = user.father_name
+            profile.mother_name = user.mother_name
+        if admin_review_notes is not None:
+            user.admin_review_notes = admin_review_notes.strip() or None
+
+        db.query(VerificationRejection).filter(
+            VerificationRejection.user_id == user_id
+        ).delete()
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to approve verification: {str(exc)}") from exc
+
+    return SimpleVerificationActionResponse(
+        success=True,
+        message="User verification approved",
+        verification_status=user.verification_status,
+    )
+
+@router.post("/reject/{user_id}", response_model=SimpleVerificationActionResponse)
 async def reject_verification(
     user_id: str,
     rejection_notes: str = Form(...),
@@ -627,18 +780,123 @@ async def reject_verification(
     user = db.query(User).filter(User.id == user_id, User.is_deleted == False).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    user.reject_verification(rejection_notes)
-    existing_rejection = db.query(VerificationRejection).filter(
-        VerificationRejection.user_id == user_id
-    ).first()
-    if existing_rejection:
-        existing_rejection.notes = rejection_notes
+
+    try:
+        user.reject_verification(rejection_notes)
+        user.ocr_review_status = "rejected"
+        user.admin_review_notes = rejection_notes
+        existing_rejection = db.query(VerificationRejection).filter(
+            VerificationRejection.user_id == user_id
+        ).first()
+        if existing_rejection:
+            existing_rejection.notes = rejection_notes
+        else:
+            db.add(VerificationRejection(user_id=user_id, notes=rejection_notes))
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to reject verification: {str(exc)}") from exc
+
+    return SimpleVerificationActionResponse(
+        success=True,
+        message="User verification rejected",
+        verification_status=user.verification_status,
+    )
+
+@router.post("/request-correction/{user_id}", response_model=SimpleVerificationActionResponse)
+async def request_verification_correction(
+    user_id: str,
+    request: AdminVerificationCorrectionRequest,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user),
+):
+    """
+    Admin endpoint to request correction of submitted identity information.
+    """
+    user = db.query(User).filter(User.id == user_id, User.is_deleted == False).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    try:
+        user.verification_status = "correction_required"
+        user.identity_verified = False
+        user.verified_at = None
+        user.ocr_confirmed = False
+        user.admin_review_notes = request.reason.strip()
+        user.ocr_review_status = "correction_required"
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to request correction: {str(exc)}") from exc
+
+    return SimpleVerificationActionResponse(
+        success=True,
+        message="Verification correction requested",
+        verification_status=user.verification_status,
+    )
+
+@router.post("/correct-submitted-info", response_model=SimpleVerificationActionResponse)
+async def correct_submitted_info(
+    request: CorrectSubmittedIdentityRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Allow a user to correct submitted identity data before resubmission.
+    """
+    if current_user.verification_status == "verified":
+        raise HTTPException(status_code=400, detail="Verified identity data cannot be corrected")
+
+    if current_user.verification_status not in {"correction_required", "resubmission_required", "rejected"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Identity corrections are only allowed after a correction or rejection request",
+        )
+
+    normalized_name = request.name.strip()
+    if not normalized_name:
+        raise HTTPException(status_code=400, detail="Name is required")
+
+    normalized_nid = _normalize_nid_value(request.nid)
+    if not normalized_nid:
+        raise HTTPException(status_code=400, detail="NID is required")
+    if not _is_valid_nid(normalized_nid):
+        raise HTTPException(status_code=400, detail="NID must contain 10, 13, or 17 digits")
+
+    parsed_date_of_birth = _parse_user_date_of_birth(request.date_of_birth)
+    if parsed_date_of_birth is not None:
+        corrected_age = _calculate_age_from_date_of_birth(parsed_date_of_birth)
     else:
-        db.add(VerificationRejection(user_id=user_id, notes=rejection_notes))
-    db.commit()
-    
-    return {"success": True, "message": "User verification rejected"}
+        if request.age is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Age is required when date_of_birth is not provided",
+            )
+        if request.age < 0:
+            raise HTTPException(status_code=400, detail="Age must be a valid number")
+        corrected_age = request.age
+
+    try:
+        current_user.set_official_identity(
+            name=normalized_name,
+            nid=normalized_nid,
+            date_of_birth=parsed_date_of_birth,
+            age=corrected_age,
+        )
+        current_user.ocr_confirmed = False
+        current_user.verification_status = "not_submitted"
+        current_user.verified_at = None
+        _clear_comparison_fields(current_user)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update submitted information: {str(exc)}") from exc
+
+    return SimpleVerificationActionResponse(
+        success=True,
+        message="Submitted identity information updated successfully",
+        verification_status=current_user.verification_status,
+    )
 
 @router.post("/guardian/approve/{user_id}")
 async def approve_guardian_verification(
@@ -685,7 +943,7 @@ async def get_pending_verifications(
     Admin endpoint to get all pending verifications
     """
     pending_users = db.query(User).filter(
-        User.verification_status.in_(["pending", "in_progress"]),
+        User.verification_status.in_(["pending", "in_progress", "correction_required"]),
         User.is_deleted == False
     ).all()
     

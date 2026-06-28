@@ -90,6 +90,7 @@ class TestVerificationController:
             mock_user.verification_status = "verified"
             mock_user.verified_at = None
             mock_user.verification_notes = None
+            mock_user.nid = "1234567890123"
             mock_user.ocr_name = "Test User"
             mock_user.ocr_father_name = None
             mock_user.ocr_mother_name = None
@@ -116,6 +117,7 @@ class TestVerificationController:
                 data = response.json()
                 assert data["verification_status"] == "verified"
                 assert data["ocr_name"] == "Test User"
+                assert data["nid"] == "*********0123"
                 assert data["ocr_nid_number"] == "1234567890123"
                 assert data["ocr_warnings"] == ["minor glare"]
                 assert data["ocr_confirmed"] is True
@@ -177,7 +179,7 @@ class TestVerificationController:
                 pending_user = data["pending_verifications"][0]
                 assert pending_user["name"] == "Test User"
                 assert pending_user["age"] == 25
-                assert pending_user["nid"] == "1234567890123"
+                assert pending_user["nid"] == "*********0123"
                 assert pending_user["ocr_name"] == "Test User"
                 assert pending_user["ocr_name_match_status"] == "matched"
                 assert pending_user["ocr_nid_match"] is True
@@ -186,6 +188,103 @@ class TestVerificationController:
                 assert pending_user["ocr_warnings"] == ["minor glare"]
             finally:
                 app.dependency_overrides.pop(get_current_admin_user, None)
+                app.dependency_overrides.pop(get_db, None)
+
+    def test_approve_verification_copies_ocr_identity_to_user(self):
+        """Test admin approval promotes OCR identity into official user fields."""
+        with patch('controllers.verification_controller.verification_controller.get_current_admin_user') as mock_get_admin, \
+             patch('controllers.verification_controller.verification_controller.get_db') as mock_get_db:
+
+            mock_admin = Mock(spec=User)
+            mock_get_admin.return_value = mock_admin
+
+            user = User("Original Name", "test@example.com", "password123", "Male", "1234567890", 25)
+            user.id = "test-user-id"
+            user.ocr_name = "Ayesha Rahman"
+            user.ocr_father_name = "Md. Rahman Ali"
+            user.ocr_mother_name = "Salma Rahman"
+            user.ocr_date_of_birth = datetime(1998, 4, 12).date()
+            user.ocr_nid_number = "1234567890123"
+
+            mock_query = Mock()
+            mock_query.filter.return_value.first.return_value = user
+            mock_db = Mock()
+            mock_db.query.return_value = mock_query
+            mock_get_db.return_value = mock_db
+            app.dependency_overrides[get_current_admin_user] = lambda: mock_admin
+            app.dependency_overrides[get_db] = lambda: mock_db
+
+            try:
+                response = client.post(f"/verification/approve/{user.id}")
+
+                assert response.status_code == 200
+                data = response.json()
+                assert data["success"] is True
+                assert data["verification_status"] == "verified"
+                assert user.name == "Ayesha Rahman"
+                assert user.father_name == "Md. Rahman Ali"
+                assert user.mother_name == "Salma Rahman"
+                assert user.nid == "1234567890123"
+                assert user.identity_verified is True
+                assert user.verification_status == "verified"
+                assert user.verified_at is not None
+                mock_db.commit.assert_called_once()
+            finally:
+                app.dependency_overrides.pop(get_current_admin_user, None)
+                app.dependency_overrides.pop(get_db, None)
+
+    def test_correct_submitted_info_updates_official_user_fields(self):
+        """Test user corrections update the main signup identity fields."""
+        with patch('controllers.verification_controller.verification_controller.get_current_user') as mock_get_user, \
+             patch('controllers.verification_controller.verification_controller.get_db') as mock_get_db:
+
+            user = User("Original Name", "test@example.com", "password123", "Male", "1234567890", 25)
+            user.id = "test-user-id"
+            user.verification_status = "rejected"
+            user.ocr_name_match_score = 0.4
+            user.ocr_name_match_status = "does_not_match"
+            user.ocr_nid_match = False
+            user.ocr_dob_match = False
+            user.ocr_review_status = "rejected"
+            user.admin_review_notes = "Name mismatch"
+            mock_get_user.return_value = user
+
+            mock_db = Mock()
+            mock_db.commit = Mock()
+            mock_db.rollback = Mock()
+            mock_get_db.return_value = mock_db
+            app.dependency_overrides[get_current_user] = lambda: user
+            app.dependency_overrides[get_db] = lambda: mock_db
+
+            try:
+                response = client.post(
+                    "/verification/correct-submitted-info",
+                    json={
+                        "name": "Ayesha Rahman",
+                        "nid": "1234-567-890123",
+                        "date_of_birth": "1998-04-12"
+                    },
+                )
+
+                assert response.status_code == 200
+                data = response.json()
+                assert data["success"] is True
+                assert data["verification_status"] == "not_submitted"
+                assert user.name == "Ayesha Rahman"
+                assert user.nid == "1234567890123"
+                assert user.date_of_birth.isoformat() == "1998-04-12"
+                assert user.age == datetime.now().year - 1998 - (
+                    (datetime.now().month, datetime.now().day) < (4, 12)
+                )
+                assert user.ocr_confirmed is False
+                assert user.ocr_name_match_score is None
+                assert user.ocr_name_match_status is None
+                assert user.ocr_nid_match is None
+                assert user.ocr_dob_match is None
+                assert user.ocr_review_status is None
+                mock_db.commit.assert_called_once()
+            finally:
+                app.dependency_overrides.pop(get_current_user, None)
                 app.dependency_overrides.pop(get_db, None)
 
     def test_reject_verification_keeps_user_notes_separate(self):
