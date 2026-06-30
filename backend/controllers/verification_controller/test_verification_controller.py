@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 from main import app
 from database import get_db
 from models.user.user import User
-from services.gemini_nid_ocr_service import NIDOcrExtractionResult
+from services.gemini_nid_ocr_service import NIDOcrExtractionError, NIDOcrExtractionResult
 from shared.token import get_current_admin_user, get_current_user
 
 client = TestClient(app)
@@ -190,6 +190,62 @@ class TestVerificationController:
                 app.dependency_overrides.pop(get_current_admin_user, None)
                 app.dependency_overrides.pop(get_db, None)
 
+    def test_get_pending_verifications_treats_nid_spaces_as_ignorable(self):
+        """OCR NID spacing should not affect comparison against the submitted NID."""
+        with patch('controllers.verification_controller.verification_controller.get_current_admin_user') as mock_get_admin, \
+             patch('controllers.verification_controller.verification_controller.get_db') as mock_get_db:
+
+            mock_admin = Mock(spec=User)
+            mock_get_admin.return_value = mock_admin
+
+            user = Mock(spec=User)
+            user.id = "test-user-id"
+            user.name = "Test User"
+            user.email = "test@example.com"
+            user.age = 25
+            user.date_of_birth = None
+            user.nid = "1234567890123"
+            user.verification_status = "pending"
+            user.verification_notes = "Ready for verification"
+            user.guardian_verification_status = "not_submitted"
+            user.nid_image_data = b"image-bytes"
+            user.nid_image_filename = "nid.png"
+            user.created_at = datetime(2026, 6, 24, 10, 30, 0)
+            user.ocr_name = "Test User"
+            user.ocr_father_name = "Father Name"
+            user.ocr_mother_name = "Mother Name"
+            user.ocr_date_of_birth = None
+            user.ocr_nid_number = "123 4567 890123"
+            user.ocr_image_quality = "good"
+            user.ocr_warnings = []
+            user.ocr_confirmed = True
+            user.ocr_processed_at = datetime(2026, 6, 24, 11, 0, 0)
+            user.ocr_name_match_score = 1.0
+            user.ocr_name_match_status = "matched"
+            user.ocr_nid_match = None
+            user.ocr_dob_match = None
+            user.ocr_review_status = "pending_review"
+            user.admin_review_notes = None
+
+            mock_db = Mock()
+            mock_query = Mock()
+            mock_query.filter.return_value.all.return_value = [user]
+            mock_db.query.return_value = mock_query
+            mock_get_db.return_value = mock_db
+            app.dependency_overrides[get_current_admin_user] = lambda: mock_admin
+            app.dependency_overrides[get_db] = lambda: mock_db
+
+            try:
+                response = client.get("/verification/pending")
+
+                assert response.status_code == 200
+                data = response.json()
+                pending_user = data["pending_verifications"][0]
+                assert pending_user["ocr_nid_match"] is True
+            finally:
+                app.dependency_overrides.pop(get_current_admin_user, None)
+                app.dependency_overrides.pop(get_db, None)
+
     def test_approve_verification_copies_ocr_identity_to_user(self):
         """Test admin approval promotes OCR identity into official user fields."""
         with patch('controllers.verification_controller.verification_controller.get_current_admin_user') as mock_get_admin, \
@@ -226,6 +282,7 @@ class TestVerificationController:
                 assert user.mother_name == "Salma Rahman"
                 assert user.nid == "1234567890123"
                 assert user.identity_verified is True
+                assert user.ocr_confirmed is True
                 assert user.verification_status == "verified"
                 assert user.verified_at is not None
                 mock_db.commit.assert_called_once()
@@ -434,6 +491,39 @@ class TestVerificationController:
 
                 assert response.status_code == 400
                 assert "Only JPEG, PNG, and WebP images are allowed" in response.json()["detail"]
+            finally:
+                app.dependency_overrides.pop(get_current_user, None)
+                app.dependency_overrides.pop(get_db, None)
+
+    def test_extract_nid_information_surfaces_ocr_failure_reason(self):
+        """Test OCR extraction returns the underlying OCR error message."""
+        with patch('controllers.verification_controller.verification_controller.get_current_user') as mock_get_user, \
+             patch('controllers.verification_controller.verification_controller.get_db') as mock_get_db, \
+             patch('controllers.verification_controller.verification_controller.ocr_service.extract') as mock_extract:
+
+            user = User("Test User", "test@example.com", "password123", "Male", "1234567890", 25)
+            user.id = "test-user-id"
+            mock_get_user.return_value = user
+
+            mock_db = Mock()
+            mock_db.commit = Mock()
+            mock_db.rollback = Mock()
+            mock_get_db.return_value = mock_db
+            app.dependency_overrides[get_current_user] = lambda: user
+            app.dependency_overrides[get_db] = lambda: mock_db
+
+            try:
+                mock_extract.side_effect = NIDOcrExtractionError("Gemini OCR request timed out")
+
+                response = client.post(
+                    "/verification/extract-nid",
+                    files={"nid_image": ("nid.png", b"fake image data", "image/png")},
+                )
+
+                assert response.status_code == 200
+                data = response.json()
+                assert data["success"] is False
+                assert data["message"] == "Gemini OCR request timed out"
             finally:
                 app.dependency_overrides.pop(get_current_user, None)
                 app.dependency_overrides.pop(get_db, None)

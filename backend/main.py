@@ -1,6 +1,7 @@
 import os
 from fastapi import FastAPI
 from database import Base, engine
+import models  # noqa: F401
 from controllers.auth_controller import auth_controller
 from controllers.verification_controller import verification_controller
 from controllers.admin_controller import admin_controller
@@ -9,10 +10,6 @@ from controllers.interest_controller import interest_controller
 from controllers.notification_controller import notification_controller
 from controllers.message_controller import message_controller
 from controllers import trust_safety_controller
-from models.message.message import Message
-from models.block import Block
-from models.report import Report
-from models.verification_rejection import VerificationRejection
 from create_db import create_database
 from middlewares import cors_middleware
 from middlewares import static_middleware

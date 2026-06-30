@@ -1,4 +1,5 @@
 import json
+import logging
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from typing import Optional
 
@@ -48,6 +49,7 @@ class GeminiNidOcrService:
             )
 
         self._client = genai.Client(api_key=api_key)
+        self._logger = logging.getLogger(__name__)
 
     def extract(self, image_data: bytes, content_type: str) -> NIDOcrExtractionResult:
         prompt = (
@@ -107,11 +109,18 @@ class GeminiNidOcrService:
             if not raw_text:
                 raise NIDOcrExtractionError("Gemini returned an empty OCR response")
 
-            payload = json.loads(raw_text)
+            try:
+                payload = json.loads(raw_text)
+            except json.JSONDecodeError as exc:
+                raise NIDOcrExtractionError("Gemini OCR response was not valid JSON") from exc
+
             if not isinstance(payload, dict):
                 raise NIDOcrExtractionError("Gemini OCR response was not an object")
 
-            return NIDOcrExtractionResult.model_validate(payload)
+            try:
+                return NIDOcrExtractionResult.model_validate(payload)
+            except Exception as exc:
+                raise NIDOcrExtractionError("Gemini OCR response did not match the expected schema") from exc
         except NIDOcrExtractionError:
             raise
         except FuturesTimeoutError as exc:
@@ -119,7 +128,10 @@ class GeminiNidOcrService:
                 "Gemini OCR request timed out"
             ) from exc
         except Exception as exc:
-            raise NIDOcrExtractionError("Failed to extract NID information") from exc
+            self._logger.exception("Gemini OCR request failed")
+            raise NIDOcrExtractionError(
+                f"Gemini OCR request failed: {type(exc).__name__}"
+            ) from exc
 
 
 ocr_service = GeminiNidOcrService()

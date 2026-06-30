@@ -1,4 +1,5 @@
 import json
+import logging
 from difflib import SequenceMatcher
 from datetime import date, datetime, timezone
 from typing import Optional
@@ -19,6 +20,7 @@ from services.gemini_nid_ocr_service import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 ALLOWED_NID_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_NID_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
@@ -311,8 +313,8 @@ def _derive_name_match_status(
 
 
 def _derive_nid_match(submitted_nid: Optional[str], ocr_nid: Optional[str]) -> Optional[bool]:
-    normalized_submitted = _normalize_text_for_comparison(submitted_nid)
-    normalized_ocr = _normalize_text_for_comparison(ocr_nid)
+    normalized_submitted = _normalize_nid_value(submitted_nid)
+    normalized_ocr = _normalize_nid_value(ocr_nid)
     if not normalized_submitted or not normalized_ocr:
         return None
 
@@ -518,10 +520,11 @@ async def extract_nid_information(
                 image_data=nid_image_data,
                 content_type=nid_image.content_type,
             )
-        except NIDOcrExtractionError:
+        except NIDOcrExtractionError as exc:
+            logger.warning("NID OCR extraction failed: %s", exc)
             return _build_ocr_response(
                 success=False,
-                message="We could not extract NID information at this time. Please try again.",
+                message=str(exc) or "We could not extract NID information at this time. Please try again.",
             )
 
         if not extraction.document_detected:
@@ -582,6 +585,7 @@ async def extract_nid_information(
     except HTTPException:
         raise
     except Exception:
+        logger.exception("Unexpected error during NID OCR extraction")
         db.rollback()
         return _build_ocr_response(
             success=False,
@@ -741,6 +745,7 @@ async def approve_verification(
 
     try:
         _update_verified_identity_from_ocr(user)
+        user.ocr_confirmed = True
         profile = ProfileRepository.get_by_user_id(db, user_id)
         if profile:
             profile.identity_verified = True

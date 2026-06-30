@@ -64,6 +64,7 @@ const NIDVerification: React.FC = () => {
   const navigate = useNavigate();
 
   const backendVerificationStatus = currentStatus?.verification_status ?? null;
+  const isVerificationLocked = backendVerificationStatus === "verified";
   const isBackendStatusVisible = Boolean(
     backendVerificationStatus &&
       ["pending", "verified", "rejected", "resubmission_required", "correction_required", "processing"].includes(backendVerificationStatus)
@@ -95,7 +96,7 @@ const NIDVerification: React.FC = () => {
           setCurrentStatus(statusData);
 
           setNotes(statusData.verification_notes ?? "");
-          setOcrConfirmed(Boolean(statusData.ocr_confirmed));
+          setOcrConfirmed(Boolean(statusData.ocr_confirmed) || statusData.verification_status === "verified");
           setStatus("");
 
           if (hasSavedOcrData(statusData)) {
@@ -126,6 +127,9 @@ const NIDVerification: React.FC = () => {
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isVerificationLocked) {
+      return;
+    }
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
       setOcrStatus("idle");
@@ -136,7 +140,7 @@ const NIDVerification: React.FC = () => {
   };
 
   const extractNidInformation = async () => {
-    if (!file) {
+    if (isVerificationLocked || !file) {
       return;
     }
 
@@ -203,6 +207,9 @@ const NIDVerification: React.FC = () => {
   };
 
   const handleUploadDifferentImage = () => {
+    if (isVerificationLocked) {
+      return;
+    }
     setFile(null);
     setOcrStatus("idle");
     setOcrError("");
@@ -260,7 +267,7 @@ const NIDVerification: React.FC = () => {
           const statusData: VerificationStatusResponse = await statusResponse.json();
           setCurrentStatus(statusData);
           setNotes(statusData.verification_notes ?? "");
-          setOcrConfirmed(Boolean(statusData.ocr_confirmed));
+          setOcrConfirmed(Boolean(statusData.ocr_confirmed) || statusData.verification_status === "verified");
         }
         setStatus("");
       } else {
@@ -347,7 +354,8 @@ const NIDVerification: React.FC = () => {
               ref={fileInputRef}
               accept="image/*"
               onChange={handleFileChange}
-              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+              disabled={isVerificationLocked}
+              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
             />
             {file && <p className="mt-2 text-sm text-gray-600">Selected File: {file.name}</p>}
             <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
@@ -372,7 +380,7 @@ const NIDVerification: React.FC = () => {
             <button
               type="button"
               onClick={handleExtractClick}
-              disabled={!file || ocrStatus === "processing"}
+              disabled={isVerificationLocked || !file || ocrStatus === "processing"}
               className="mt-3 inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-400"
             >
               {ocrStatus === "processing" ? "Reading Your NID Information..." : "Extract NID Information"}
@@ -391,7 +399,9 @@ const NIDVerification: React.FC = () => {
                 Information detected from your NID:
               </h3>
               <p className="mt-1 text-sm text-gray-600">
-                Review and edit the information extracted from your uploaded NID if needed.
+                {isVerificationLocked
+                  ? "This verification has been approved. The extracted information is now locked."
+                  : "Review and edit the information extracted from your uploaded NID if needed."}
               </p>
 
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -401,7 +411,9 @@ const NIDVerification: React.FC = () => {
                     type="text"
                     value={ocrData.name ?? ""}
                     onChange={(e) => updateOcrField("name", e.target.value)}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-4 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    disabled={isVerificationLocked}
+                    readOnly={isVerificationLocked}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-4 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="Enter full name"
                   />
                 </div>
@@ -411,7 +423,9 @@ const NIDVerification: React.FC = () => {
                     type="text"
                     value={ocrData.father_name ?? ""}
                     onChange={(e) => updateOcrField("father_name", e.target.value)}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-4 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    disabled={isVerificationLocked}
+                    readOnly={isVerificationLocked}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-4 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="Enter father's name"
                   />
                 </div>
@@ -421,7 +435,9 @@ const NIDVerification: React.FC = () => {
                     type="text"
                     value={ocrData.mother_name ?? ""}
                     onChange={(e) => updateOcrField("mother_name", e.target.value)}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-4 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    disabled={isVerificationLocked}
+                    readOnly={isVerificationLocked}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-4 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="Enter mother's name"
                   />
                 </div>
@@ -431,7 +447,9 @@ const NIDVerification: React.FC = () => {
                     type="text"
                     value={ocrData.date_of_birth ?? ""}
                     onChange={(e) => updateOcrField("date_of_birth", e.target.value)}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-4 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    disabled={isVerificationLocked}
+                    readOnly={isVerificationLocked}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-4 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="YYYY-MM-DD"
                   />
                 </div>
@@ -441,7 +459,9 @@ const NIDVerification: React.FC = () => {
                     type="text"
                     value={ocrData.nid_number ?? ""}
                     onChange={(e) => updateOcrField("nid_number", e.target.value)}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-4 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    disabled={isVerificationLocked}
+                    readOnly={isVerificationLocked}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-4 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="Enter NID number"
                   />
                 </div>
@@ -464,7 +484,8 @@ const NIDVerification: React.FC = () => {
                     type="checkbox"
                     checked={ocrConfirmed}
                     onChange={(e) => setOcrConfirmed(e.target.checked)}
-                    className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    disabled={isVerificationLocked}
+                    className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
                   />
                   <span>I confirm that the information shown above belongs to me.</span>
                 </label>
@@ -472,7 +493,8 @@ const NIDVerification: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleUploadDifferentImage}
-                  className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                  disabled={isVerificationLocked}
+                  className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Upload a Different NID Image
                 </button>
