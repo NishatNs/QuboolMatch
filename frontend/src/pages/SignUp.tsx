@@ -5,6 +5,7 @@ import { API_BASE_URL } from "../services/api";
 import { Button, Input, Select, Card } from "../components/ui";
 
 const SignUp: React.FC = () => {
+  const ONBOARDING_PENDING_KEY = "verificationOnboardingPending";
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -22,7 +23,8 @@ const SignUp: React.FC = () => {
 
   useEffect(() => {
     if (isAuthReady && isLoggedIn) {
-      navigate("/", { replace: true });
+      const onboardingPending = localStorage.getItem(ONBOARDING_PENDING_KEY) === "true";
+      navigate(onboardingPending ? "/nid-verification" : "/", { replace: true });
     }
   }, [isAuthReady, isLoggedIn, navigate]);
 
@@ -102,6 +104,7 @@ const SignUp: React.FC = () => {
       const data = await response.json();
       
       // Log the user in with the real token
+      localStorage.setItem(ONBOARDING_PENDING_KEY, "true");
       login(data.access_token);
       
       // Navigate directly to NID verification page

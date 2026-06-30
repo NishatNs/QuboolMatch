@@ -49,6 +49,7 @@ const hasSavedOcrData = (statusData: VerificationStatusResponse) =>
   );
 
 const NIDVerification: React.FC = () => {
+  const ONBOARDING_PENDING_KEY = "verificationOnboardingPending";
   const [file, setFile] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState("");
@@ -115,6 +116,10 @@ const NIDVerification: React.FC = () => {
             setOcrData(null);
             setOcrStatus("idle");
           }
+
+          if (statusData.verification_status === "verified") {
+            localStorage.removeItem(ONBOARDING_PENDING_KEY);
+          }
         }
       } catch (error) {
         console.error("Error fetching verification status:", error);
@@ -125,6 +130,12 @@ const NIDVerification: React.FC = () => {
 
     fetchVerificationStatus();
   }, []);
+
+  useEffect(() => {
+    if (currentStatus?.verification_status === "verified") {
+      localStorage.removeItem(ONBOARDING_PENDING_KEY);
+    }
+  }, [currentStatus?.verification_status]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (isVerificationLocked) {
