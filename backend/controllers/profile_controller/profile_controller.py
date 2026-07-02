@@ -7,11 +7,12 @@ from database import get_db
 from repositories.profile_repository.profile_repository import ProfileRepository
 from repositories.block_repository import BlockRepository
 from shared.token import Token
+from models.profile.profile import Profile
 from models.user.user import User
 import json
 import base64
 import re
-from datetime import datetime
+from datetime import date, datetime
 
 router = APIRouter()
 
@@ -84,6 +85,28 @@ def process_base64_file(base64_data: str) -> tuple:
     except Exception as e:
         print(f"Error processing base64 file: {e}")
         return None, None, None
+
+
+def _optional_string(value) -> Optional[str]:
+    return value if isinstance(value, str) else None
+
+
+def _optional_int(value) -> Optional[int]:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _optional_float(value) -> Optional[float]:
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
+def _optional_bool(value) -> Optional[bool]:
+    return value if isinstance(value, bool) else None
+
+
+def _optional_isoformat(value) -> Optional[str]:
+    if not isinstance(value, (date, datetime)):
+        return None
+    return value.isoformat()
 
 
 def _build_profile_response(profile, user: User) -> dict:
@@ -214,8 +237,13 @@ async def create_profile(
         # genetic_conditions and necessary_preferences are already strings from frontend
 
         if user.identity_verified:
-            for field_name in ("name", "age", "date_of_birth", "gender", "father_name", "mother_name"):
-                profile_dict.pop(field_name, None)
+            profile_dict["identity_verified"] = True
+            if user.father_name is not None:
+                profile_dict["father_name"] = user.father_name
+            if user.mother_name is not None:
+                profile_dict["mother_name"] = user.mother_name
+            if user.date_of_birth is not None:
+                profile_dict["date_of_birth"] = user.date_of_birth
         
         # Process base64 files
         if profile_dict.get('profile_picture'):
@@ -283,7 +311,7 @@ async def get_profile(
         profile = ProfileRepository.get_by_user_id(db, user_id)
         
         if not profile:
-            raise HTTPException(status_code=404, detail="Profile not found")
+            profile = Profile(user_id=user_id)
         
         return JSONResponse(content=_build_profile_response(profile, user), status_code=200)
     except HTTPException:
@@ -309,7 +337,9 @@ async def update_profile(
         profile = ProfileRepository.get_by_user_id(db, user_id)
         
         if not profile:
-            raise HTTPException(status_code=404, detail="Profile not found")
+            profile = Profile(user_id=user_id)
+            db.add(profile)
+            db.flush()
         
         # Get profile data
         profile_dict = profile_data.dict(exclude_unset=True)
@@ -321,8 +351,13 @@ async def update_profile(
         # genetic_conditions and necessary_preferences are already strings from frontend
 
         if user.identity_verified:
-            for field_name in ("name", "age", "date_of_birth", "gender", "father_name", "mother_name"):
-                profile_dict.pop(field_name, None)
+            profile_dict["identity_verified"] = True
+            if user.father_name is not None:
+                profile_dict["father_name"] = user.father_name
+            if user.mother_name is not None:
+                profile_dict["mother_name"] = user.mother_name
+            if user.date_of_birth is not None:
+                profile_dict["date_of_birth"] = user.date_of_birth
         
         # Process base64 files
         if 'profile_picture' in profile_dict and profile_dict['profile_picture']:
