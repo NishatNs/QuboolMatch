@@ -707,14 +707,16 @@ async def get_recommendations(
         print(f"[RECOMMENDATIONS] Current user ID: {current_user_id}")
 
         from repositories.interest_repository.interest_repository import InterestRepository
-        from services.recommendation_service import get_recommendations as ml_recommend, is_ready
+        from services.recommendation_service_v2 import get_recommendations as ml_recommend, is_ready
         blocked_ids = BlockRepository.get_blocked_user_ids(db, current_user_id)
 
         print("[RECOMMENDATIONS] Checking if ML model is ready...")
         ml_ready = is_ready()
 
         # Get ML-ranked user_id list (or None if user not in model index) - fetch more for pagination
-        ranked_ids = ml_recommend(current_user_id, db, top_n=200) if ml_ready else None
+        ranked_matches = ml_recommend(current_user_id, db, top_n=200) if ml_ready else None
+        reasons_by_id = {item["user_id"]: item["reason_tags"] for item in (ranked_matches or [])}
+        ranked_ids = [item["user_id"] for item in ranked_matches] if ranked_matches else None
         print(f"[RECOMMENDATIONS] ML ready: {ml_ready}, Ranked IDs count: {len(ranked_ids) if ranked_ids else 0}")
 
         # Fall back: all users except self when model is unavailable OR returns no candidates.
@@ -810,7 +812,8 @@ async def get_recommendations(
                 "preferred_age_min": profile.preferred_age_min if profile else None,
                 "preferred_age_max": profile.preferred_age_max if profile else None,
                 "living_with_in_laws": profile.living_with_in_laws if profile else None,
-                "willing_to_relocate": profile.willing_to_relocate if profile else None
+                "willing_to_relocate": profile.willing_to_relocate if profile else None,
+                "recommendation_reasons": reasons_by_id.get(user.id, [])
             })
 
         has_more = (offset + len(result)) < total_count

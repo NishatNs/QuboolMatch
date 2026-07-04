@@ -33,6 +33,7 @@ interface User {
   preferred_age_max?: number | null;
   living_with_in_laws?: string | null;
   willing_to_relocate?: boolean | null;
+  recommendation_reasons?: string[];
 }
 
 type ViewMode = 'all' | 'recommended' | 'interested';
@@ -565,6 +566,15 @@ const FindMatches: React.FC = () => {
                     <div className="p-5">
                       <h3 className="text-xl font-bold text-gray-800">{user.name}, {user.age}</h3>
                       {renderVerificationBadges(user)}
+                      {viewMode === 'recommended' && user.recommendation_reasons && user.recommendation_reasons.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {user.recommendation_reasons.map((reason) => (
+                            <span key={reason} className="rounded-full bg-pink-50 px-2 py-1 text-xs font-medium text-pink-700">
+                              {reason}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       
                       <div className="mt-2 text-sm text-gray-600 space-y-1">
                         {user.location && (

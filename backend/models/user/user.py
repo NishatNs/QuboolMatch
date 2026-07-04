@@ -30,6 +30,8 @@ class User(Base):
     
     # System fields
     is_admin = Column(Boolean, default=False, nullable=False)
+    # Synthetic accounts imported for local/demo recommendation testing.
+    is_demo = Column(Boolean, default=False, nullable=False)
     identity_verified = Column(Boolean, default=False, nullable=False)
     is_deleted = Column(Boolean, default=False)
     is_archived = Column(Boolean, default=False)
@@ -64,11 +66,11 @@ class User(Base):
 
     def __init__(self, name: str, email: str, password: str, gender: str, nid: str, age: int, 
                  religion: str = None, preferred_age_from: int = None, preferred_age_to: int = None, 
-                 is_admin: bool = False):
+                 is_admin: bool = False, hashed_password: str = None):
         self.id = str(uuid.uuid4())
         self.name = name
         self.email = email
-        self.hashed_password = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+        self.hashed_password = hashed_password or bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
         self.gender = gender
         self.nid = nid
         self.age = age
