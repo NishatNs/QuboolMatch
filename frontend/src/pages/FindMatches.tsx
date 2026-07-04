@@ -314,8 +314,8 @@ const FindMatches: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 py-8">
-      <div className="container mx-auto px-4">
-        <div className="bg-white rounded-xl shadow-lg p-6">
+      <div className="container mx-auto max-w-7xl px-4">
+        <div className="bg-white rounded-xl shadow-lg p-5 sm:p-6">
           <h1 className="text-3xl font-bold text-gray-800 text-center mb-6">Find Your Perfect Match</h1>
 
           {/* View Mode Toggle */}
@@ -520,7 +520,7 @@ const FindMatches: React.FC = () => {
           ) : filteredUsers.length > 0 ? (
             <>
               <p className="text-gray-600 mb-4">Showing {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''}</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[70vh] overflow-y-auto p-2">
+              <div className="grid grid-cols-1 items-start gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {filteredUsers.map((user) => (
                   <div key={user.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300">
                     {/* Profile Image */}
@@ -529,14 +529,14 @@ const FindMatches: React.FC = () => {
                         <img 
                           src={user.profile_picture} 
                           alt={`${user.name}'s profile`}
-                          className="w-full h-60 object-cover object-center"
+                          className="h-52 w-full object-cover object-center"
                           onError={(e) => {
                             e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&size=400&background=random`;
                           }}
                         />
                       ) : (
-                        <div className="w-full h-60 bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center">
-                          <span className="text-white text-6xl font-bold">{user.name.charAt(0)}</span>
+                        <div className="flex h-52 w-full items-center justify-center bg-gradient-to-br from-indigo-400 to-purple-500">
+                          <span className="text-5xl font-bold text-white">{user.name.charAt(0)}</span>
                         </div>
                       )}
                       
@@ -563,8 +563,8 @@ const FindMatches: React.FC = () => {
                     </div>
                     
                     {/* Profile Details */}
-                    <div className="p-5">
-                      <h3 className="text-xl font-bold text-gray-800">{user.name}, {user.age}</h3>
+                    <div className="p-4">
+                      <h3 className="text-lg font-bold text-gray-800">{user.name}, {user.age}</h3>
                       {renderVerificationBadges(user)}
                       {viewMode === 'recommended' && user.recommendation_reasons && user.recommendation_reasons.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1.5">
