@@ -10,15 +10,16 @@ from models.profile.profile import Profile
 from models.user.user import User
 from recommendation.recommender import (
     DEFAULT_ARTIFACTS, INTEREST_COLS, NUMERIC_COLS, REQUIRED_COLUMNS,
-    _directional_preferences, _interest_tokens, _parse_list, _reasons, _text,
-    load_artifacts, transform_profiles,
+    _candidate_is_eligible, _directional_preferences, _interest_tokens,
+    _parse_list, _priority_key, _reasons, _text,
+    load_runtime_artifacts, transform_profiles,
 )
 from seed_recommendation_data import demo_user_id
 
 
 def is_ready() -> bool:
     try:
-        load_artifacts(DEFAULT_ARTIFACTS)
+        load_runtime_artifacts(DEFAULT_ARTIFACTS)
         return True
     except Exception:
         return False
@@ -52,9 +53,10 @@ def _query_row(user: User, profile: Profile) -> pd.Series:
     return row
 
 
-def get_recommendations(current_user_id: str, db: Session, top_n: int = 200) -> Optional[list[dict]]:
+def get_recommendations(current_user_id: str, db: Session, top_n: int = 100) -> Optional[list[dict]]:
+    top_n = max(1, min(top_n, 100))
     try:
-        artifact, candidates = load_artifacts(DEFAULT_ARTIFACTS)
+        artifact, candidates = load_runtime_artifacts(DEFAULT_ARTIFACTS)
     except Exception:
         return None
     user = db.query(User).filter(User.id == current_user_id).first()
@@ -68,9 +70,10 @@ def get_recommendations(current_user_id: str, db: Session, top_n: int = 200) -> 
     scored = []
     for distance, index in zip(distances[0], indices[0]):
         candidate = candidates.iloc[index]
-        if candidate["gender"] == query["gender"]:
+        if not _candidate_is_eligible(query, candidate):
             continue
-        db_id = demo_user_id(candidate["user_id"])
+        candidate_id = str(candidate["user_id"])
+        db_id = candidate_id if artifact.get("id_source") == "database" else demo_user_id(candidate_id)
         eligible = db.query(User.id).join(Profile, Profile.user_id == User.id).filter(
             User.id == db_id, User.is_deleted == False, User.is_archived == False,
             Profile.is_completed == True,
@@ -84,6 +87,12 @@ def get_recommendations(current_user_id: str, db: Session, top_n: int = 200) -> 
         relaxed = set(a_to_b["required_failures"] + b_to_a["required_failures"])
         scored.append({"user_id": db_id, "score": .4 * similarity + .6 * preference,
                        "similarity": similarity, "strict": not relaxed,
-                       "reason_tags": _reasons(a_to_b, b_to_a, similarity)})
-    scored.sort(key=lambda item: (not item["strict"], -item["score"], -item["similarity"], item["user_id"]))
+                       "reason_tags": _reasons(a_to_b, b_to_a, similarity),
+                       "priority_key": _priority_key(
+                           a_to_b, b_to_a, .4 * similarity + .6 * preference,
+                           similarity, db_id,
+                       )})
+    scored.sort(key=lambda item: item["priority_key"])
+    for item in scored:
+        item.pop("priority_key", None)
     return scored[:top_n]

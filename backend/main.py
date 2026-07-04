@@ -13,6 +13,7 @@ from controllers import trust_safety_controller
 from create_db import create_database
 from middlewares import cors_middleware
 from middlewares import static_middleware
+from services.retraining_coordinator import install_session_hooks, watcher
 
 app = FastAPI()
 
@@ -25,6 +26,17 @@ static_middleware.add(app)
 create_database()
 # Initialize the database
 Base.metadata.create_all(bind=engine)
+install_session_hooks()
+
+
+@app.on_event("startup")
+def start_retraining_watcher():
+    watcher.start()
+
+
+@app.on_event("shutdown")
+def stop_retraining_watcher():
+    watcher.stop()
 
 # Include routers
 app.include_router(auth_controller.router, prefix="/auth", tags=["auth"])

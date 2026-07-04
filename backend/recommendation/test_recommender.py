@@ -7,8 +7,11 @@ from fix_gender_names import INVALID_LAST_NAMES, NAME_POOLS, correct_rows
 from recommender import (
     DEFAULT_CSV,
     RecommendationError,
+    _candidate_is_eligible,
     _directional_preferences,
     _education_group,
+    _priority_key,
+    _religion_value,
     fit_model,
     load_profiles,
     recommend,
@@ -36,10 +39,16 @@ def test_recommendations_exclude_self_and_same_gender(tmp_path: Path):
 
     result = recommend(query["user_id"], 20, tmp_path)
 
-    assert result["match_count"] == 20
+    assert 0 < result["match_count"] <= 20
     assert all(item["user_id"] != query["user_id"] for item in result["matches"])
     assert all(item["gender"] != query["gender"] for item in result["matches"])
-    assert [item["rank"] for item in result["matches"]] == list(range(1, 21))
+    assert all(
+        _religion_value(item["religion"]) == _religion_value(query["preferred_religion"])
+        for item in result["matches"]
+    )
+    assert [item["rank"] for item in result["matches"]] == list(
+        range(1, result["match_count"] + 1)
+    )
 
 
 def test_ranking_is_deterministic_and_strict_first(tmp_path: Path):
@@ -54,6 +63,38 @@ def test_ranking_is_deterministic_and_strict_first(tmp_path: Path):
     compatibility = [item["strict_compatible"] for item in first["matches"]]
     assert compatibility == sorted(compatibility, reverse=True)
     assert any(not value for value in compatibility)
+    assert first["match_count"] <= 100
+
+
+def test_religion_filter_preference_fallback_and_no_preference():
+    profiles = load_profiles(DEFAULT_CSV)
+    query = profiles.iloc[0].copy()
+    candidate = profiles.loc[profiles["gender"] != query["gender"]].iloc[0].copy()
+
+    query["preferred_religion"] = "muslim"
+    candidate["religion"] = "Islam"
+    assert _candidate_is_eligible(query, candidate)
+    candidate["religion"] = "Christianity"
+    assert not _candidate_is_eligible(query, candidate)
+
+    query["preferred_religion"] = "unknown"
+    query["religion"] = "Buddhism"
+    candidate["religion"] = "buddhist"
+    assert _candidate_is_eligible(query, candidate)
+
+    query["preferred_religion"] = "noPreference"
+    candidate["religion"] = "any-religion"
+    assert _candidate_is_eligible(query, candidate)
+
+
+def test_requester_must_have_failures_are_the_first_priority():
+    base = {"dimensions": {"age": True}, "required": ["age"], "required_failures": []}
+    requester_failed = {**base, "required_failures": ["age"]}
+    reciprocal_failed = {**base, "required_failures": ["age"]}
+
+    requester_match_key = _priority_key(base, reciprocal_failed, 0.2, 0.2, "a")
+    requester_failure_key = _priority_key(requester_failed, base, 0.99, 0.99, "b")
+    assert requester_match_key < requester_failure_key
 
 
 def test_directional_preference_rules_and_required_failures():

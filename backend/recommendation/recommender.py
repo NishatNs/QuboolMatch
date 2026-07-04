@@ -73,7 +73,9 @@ class RecommendationError(ValueError):
 
 
 def _text(value: Any) -> str:
-    if value is None or pd.isna(value):
+    if value is None:
+        return "unknown"
+    if not isinstance(value, (list, tuple, set, dict, np.ndarray)) and pd.isna(value):
         return "unknown"
     result = str(value).strip().lower()
     return "unknown" if result in {"", "nan", "none"} else result
@@ -118,6 +120,19 @@ def load_profiles(csv_path: Path | str) -> pd.DataFrame:
         raise RecommendationError(f"CSV is missing required columns: {', '.join(missing)}")
     if profiles.empty:
         raise RecommendationError("CSV contains no profiles")
+    if profiles["user_id"].isna().any() or profiles["user_id"].duplicated().any():
+        raise RecommendationError("user_id values must be present and unique")
+
+    return normalize_profiles(profiles)
+
+
+def normalize_profiles(profiles: pd.DataFrame) -> pd.DataFrame:
+    """Validate and normalize profiles from CSV or database rows."""
+    missing = sorted(REQUIRED_COLUMNS - set(profiles.columns))
+    if missing:
+        raise RecommendationError(f"Profiles are missing required columns: {', '.join(missing)}")
+    if profiles.empty:
+        raise RecommendationError("Profiles contain no rows")
     if profiles["user_id"].isna().any() or profiles["user_id"].duplicated().any():
         raise RecommendationError("user_id values must be present and unique")
 
@@ -233,6 +248,21 @@ def load_artifacts(artifacts_dir: Path | str) -> tuple[dict[str, Any], pd.DataFr
     return artifact, profiles
 
 
+def load_runtime_artifacts(artifacts_dir: Path | str = DEFAULT_ARTIFACTS) -> tuple[dict[str, Any], pd.DataFrame]:
+    """Load the atomically selected DB model, or the tracked bootstrap model."""
+    root = Path(artifacts_dir)
+    pointer = root / "active.json"
+    if pointer.is_file():
+        try:
+            selected = json.loads(pointer.read_text(encoding="utf-8"))["version"]
+            version_dir = root / "versions" / selected
+            return load_artifacts(version_dir)
+        except (KeyError, json.JSONDecodeError, OSError, RecommendationError):
+            # A bad runtime pointer must not take down recommendations.
+            pass
+    return load_artifacts(root)
+
+
 def _education_group(value: Any) -> str:
     text = _text(value)
     if "phd" in text or "doctorate" in text:
@@ -310,7 +340,71 @@ def _directional_preferences(owner: pd.Series, candidate: pd.Series) -> dict[str
         weighted_total += weight if matched else 0.0
     score = weighted_total / possible if possible else 1.0
     failures = sorted(key for key in required if dimensions.get(key) is False)
-    return {"score": score, "dimensions": dimensions, "required_failures": failures}
+    return {
+        "score": score,
+        "dimensions": dimensions,
+        "required": sorted(required),
+        "required_failures": failures,
+    }
+
+
+def _religion_filter_value(query: pd.Series) -> str | None:
+    """Resolve the hard religion filter, respecting explicit no-preference."""
+    raw_preference = _text(query.get("preferred_religion"))
+    if raw_preference == "nopreference":
+        return None
+    if raw_preference not in NO_PREFERENCE:
+        return _religion_value(raw_preference)
+    actual_religion = _text(query.get("religion"))
+    return None if actual_religion in NO_PREFERENCE else _religion_value(actual_religion)
+
+
+def _religion_value(value: Any) -> str:
+    normalized = _text(value)
+    aliases = {
+        "islam": "muslim", "muslim": "muslim",
+        "christianity": "christian", "christian": "christian",
+        "hinduism": "hindu", "hindu": "hindu",
+        "buddhism": "buddhist", "buddhist": "buddhist",
+        "judaism": "jewish", "jewish": "jewish",
+        "sikhism": "sikh", "sikh": "sikh",
+    }
+    return aliases.get(normalized, normalized)
+
+
+def _candidate_is_eligible(query: pd.Series, candidate: pd.Series) -> bool:
+    if str(candidate.get("user_id")) == str(query.get("user_id")):
+        return False
+    if _text(candidate.get("gender")) == _text(query.get("gender")):
+        return False
+    religion = _religion_filter_value(query)
+    return religion is None or _religion_value(candidate.get("religion")) == religion
+
+
+def _priority_key(
+    query_to_candidate: dict[str, Any],
+    candidate_to_query: dict[str, Any],
+    score: float,
+    similarity: float,
+    user_id: str,
+) -> tuple[Any, ...]:
+    """Sort requester must-haves first, then reciprocal/mutual compatibility."""
+    requester_failures = len(query_to_candidate["required_failures"])
+    reciprocal_failures = len(candidate_to_query["required_failures"])
+    required_keys = set(query_to_candidate["required"]) | set(candidate_to_query["required"])
+    mutually_satisfied = sum(
+        query_to_candidate["dimensions"].get(key) is True
+        and candidate_to_query["dimensions"].get(key) is True
+        for key in required_keys
+    )
+    return (
+        requester_failures,
+        reciprocal_failures,
+        -mutually_satisfied,
+        -score,
+        -similarity,
+        user_id,
+    )
 
 
 def _reasons(a_to_b: dict[str, Any], b_to_a: dict[str, Any], similarity: float) -> list[str]:
@@ -338,6 +432,7 @@ def recommend(
 ) -> dict[str, Any]:
     if top_k < 1:
         raise RecommendationError("top-k must be at least 1")
+    top_k = min(top_k, 100)
     artifact, profiles = load_artifacts(artifacts_dir)
     matches = profiles.index[profiles["user_id"] == str(user_id)].tolist()
     if not matches:
@@ -351,10 +446,8 @@ def recommend(
 
     scored: list[dict[str, Any]] = []
     for distance, index in zip(distances[0], indices[0]):
-        if index == query_index:
-            continue
         candidate = profiles.iloc[index]
-        if candidate["gender"] == query["gender"]:
+        if not _candidate_is_eligible(query, candidate):
             continue
         similarity = max(0.0, min(1.0, 1.0 - float(distance)))
         a_to_b = _directional_preferences(query, candidate)
@@ -375,14 +468,17 @@ def recommend(
             "strict_compatible": not relaxed,
             "reason_tags": _reasons(a_to_b, b_to_a, similarity),
             "relaxed_preferences": relaxed,
+            "priority_key": _priority_key(
+                a_to_b, b_to_a,
+                0.40 * similarity + 0.60 * preference,
+                similarity, str(candidate["user_id"]),
+            ),
         })
 
-    strict = [item for item in scored if item["strict_compatible"]]
-    relaxed = [item for item in scored if not item["strict_compatible"]]
-    sort_key = lambda item: (-item["score"], -item["similarity"], item["user_id"])
-    ordered = sorted(strict, key=sort_key) + sorted(relaxed, key=sort_key)
+    ordered = sorted(scored, key=lambda item: item["priority_key"])
     selected = ordered[:top_k]
     for rank, item in enumerate(selected, start=1):
+        item.pop("priority_key", None)
         item["rank"] = rank
     return {
         "query_user": {"user_id": query["user_id"], "name": query["name"]},

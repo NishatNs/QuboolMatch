@@ -6,4 +6,4 @@ from models.message.message import Message
 from models.block import Block
 from models.report import Report
 from models.verification_rejection import VerificationRejection
-
+from models.recommendation_training_state import RecommendationTrainingState

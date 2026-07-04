@@ -59,6 +59,22 @@ Training reads the bundled CSV and creates these generated files under
 
 Retrain whenever the CSV or feature logic changes.
 
+## Database-backed application training
+
+After applying migrations, create the first database-backed model from the
+`backend` directory:
+
+```powershell
+python retrain_recommendation_model.py
+```
+
+The application watches committed `users` and `profiles` changes. Changes are
+coalesced for 10 seconds and trained in a separate process. PostgreSQL advisory
+locking guarantees that only one trainer publishes at a time, even with
+multiple API processes. Requests continue using the last valid artifacts and
+switch to the new version without a restart. Runtime versions are not committed
+to Git; the tracked CSV artifacts remain the bootstrap fallback.
+
 To make the bundled profiles available as local login accounts, apply the
 project migrations yourself and then run from `backend/`:
 

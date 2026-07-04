@@ -714,7 +714,7 @@ async def get_recommendations(
         ml_ready = is_ready()
 
         # Get ML-ranked user_id list (or None if user not in model index) - fetch more for pagination
-        ranked_matches = ml_recommend(current_user_id, db, top_n=200) if ml_ready else None
+        ranked_matches = ml_recommend(current_user_id, db, top_n=100) if ml_ready else None
         reasons_by_id = {item["user_id"]: item["reason_tags"] for item in (ranked_matches or [])}
         ranked_ids = [item["user_id"] for item in ranked_matches] if ranked_matches else None
         print(f"[RECOMMENDATIONS] ML ready: {ml_ready}, Ranked IDs count: {len(ranked_ids) if ranked_ids else 0}")
@@ -737,6 +737,7 @@ async def get_recommendations(
 
         if blocked_ids:
             ranked_ids = [uid for uid in ranked_ids if uid not in blocked_ids]
+        ranked_ids = ranked_ids[:100]
 
         # Apply pagination to ranked_ids
         total_count = len(ranked_ids)

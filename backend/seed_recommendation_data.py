@@ -99,6 +99,9 @@ def seed(csv_path: Path = CSV_PATH, *, allow_production: bool = False, progress_
         print("[seed] Flushing profiles and committing transaction...")
         session.commit()
         print("[seed] Commit complete")
+        from services.retraining_coordinator import request_retraining
+        request_retraining()
+        print("[seed] Recommendation retraining queued")
         return len(frame)
     except Exception as exc:
         session.rollback()
