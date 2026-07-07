@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { getAccessToken, API_BASE_URL } from "../services/api";
 import IntroVideoDisplay from "../components/IntroVideoDisplay";
 import MedicalDocumentsDisplay from "../components/MedicalDocumentsDisplay";
@@ -105,9 +105,23 @@ interface ProfileSectionCardProps {
 }
 
 const ProfileSectionCard: React.FC<ProfileSectionCardProps> = ({ title, description, children }) => {
+  const toneByTitle: Record<string, { shell: string; accent: string }> = {
+    "Profile Summary": { shell: "border-purple-200 bg-purple-50", accent: "bg-purple-500" },
+    "Profile Completion": { shell: "border-emerald-200 bg-emerald-50", accent: "bg-emerald-500" },
+    "Verified Identity": { shell: "border-violet-200 bg-violet-50", accent: "bg-violet-500" },
+    "Basic Information": { shell: "border-emerald-200 bg-emerald-50", accent: "bg-emerald-500" },
+    "Family & Guardian": { shell: "border-orange-200 bg-orange-50", accent: "bg-orange-400" },
+    "Education & Career": { shell: "border-blue-200 bg-blue-50", accent: "bg-blue-500" },
+    "Lifestyle & Interests": { shell: "border-rose-200 bg-rose-50", accent: "bg-rose-400" },
+    "Partner Preferences": { shell: "border-amber-200 bg-amber-50", accent: "bg-amber-400" },
+  };
+  const tone = toneByTitle[title] || { shell: "border-slate-200 bg-slate-50", accent: "bg-slate-400" };
+  const sectionId = `profile-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-      <div className="mb-5">
+    <section id={sectionId} className={`relative scroll-mt-28 overflow-hidden rounded-2xl border p-5 shadow-[0_8px_25px_rgba(63,45,76,0.06)] [&_.bg-gray-50]:bg-white/70 [&_.border-gray-200]:border-white/80 sm:p-6 ${tone.shell}`}>
+      <span className={`absolute inset-y-0 left-0 w-1.5 ${tone.accent}`} aria-hidden="true" />
+      <div className="mb-5 pl-1">
         <h2 className="text-lg font-semibold text-gray-800">{title}</h2>
         {description ? <p className="mt-1 text-sm text-gray-500">{description}</p> : null}
       </div>
@@ -332,6 +346,8 @@ const ProfilePage: React.FC = () => {
   const [medicalDocumentFile, setMedicalDocumentFile] = useState<File | null>(null);
   const [hasExistingVideo, setHasExistingVideo] = useState(false);
   const [hasExistingDocument, setHasExistingDocument] = useState(false);
+  const [activeProfileSection, setActiveProfileSection] = useState("profile-profile-summary");
+  const sectionHighlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const [profile, setProfile] = useState<ProfileData>({
     // Personal Information
@@ -799,21 +815,61 @@ const ProfilePage: React.FC = () => {
     loadProfile();
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (sectionHighlightTimer.current) {
+        clearTimeout(sectionHighlightTimer.current);
+      }
+    };
+  }, []);
+
+  const navigateToProfileSection = (targetId: string) => {
+    const target = document.getElementById(targetId);
+    if (!target) return;
+
+    setActiveProfileSection(targetId);
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    document.querySelectorAll(".profile-section-highlight").forEach((section) => {
+      section.classList.remove("profile-section-highlight");
+    });
+    void target.offsetWidth;
+    target.classList.add("profile-section-highlight");
+
+    if (sectionHighlightTimer.current) {
+      clearTimeout(sectionHighlightTimer.current);
+    }
+    sectionHighlightTimer.current = setTimeout(() => {
+      target.classList.remove("profile-section-highlight");
+      sectionHighlightTimer.current = null;
+    }, 700);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-100 py-8">
-      <div className="container mx-auto max-w-4xl rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
-        <h1 className="mb-6 text-center text-2xl font-bold text-gray-800">Complete Your Profile</h1>
-        <ProfileSummaryHeader
-          profile={profile}
-          completionPercent={completion.overallPercent}
-          onProfilePictureChange={handleProfilePictureChange}
-        />
-        <ProfileSectionCard
-          title="Profile Completion"
-          description="Track how much of your profile is filled out and whether your identity is verified."
-        >
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+    <div className="min-h-screen bg-[#f6f3f8] pb-12">
+      <header className="h-44 bg-gradient-to-br from-[#342154] via-[#75499a] to-[#ba5a82] px-4 pt-9 text-white shadow-xl">
+        <div className="mx-auto flex max-w-7xl items-start justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-pink-200">Your profile</p>
+            <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Complete your profile</h1>
+            <p className="mt-2 text-sm text-purple-100">A detailed profile helps us find people who genuinely fit your life.</p>
+          </div>
+        </div>
+      </header>
+
+      <div className="mx-auto -mt-16 grid max-w-7xl items-start gap-5 px-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+        <aside className="space-y-5 lg:sticky lg:top-5">
+          <ProfileSummaryHeader
+            profile={profile}
+            completionPercent={completion.overallPercent}
+            onProfilePictureChange={handleProfilePictureChange}
+          />
+          <ProfileSectionCard
+            title="Profile Completion"
+            description="Track your details and verification."
+          >
+          <div className="space-y-4">
+            <div className="rounded-xl border border-emerald-200 bg-white/80 p-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-700">Overall Completion</h3>
                 <span className="text-xs font-medium text-gray-500">{completion.overallPercent}%</span>
@@ -829,7 +885,7 @@ const ProfilePage: React.FC = () => {
               </p>
             </div>
 
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="rounded-xl border border-emerald-200 bg-white/80 p-4">
               <h3 className="text-sm font-semibold text-gray-700">Verification Status</h3>
               <div className="mt-3 flex items-center gap-2">
                 <VerifiedBadge verified={profile.identityVerified} />
@@ -838,30 +894,61 @@ const ProfilePage: React.FC = () => {
                 </span>
               </div>
             </div>
-          </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
-            <div className="flex items-center justify-between rounded border border-gray-200 bg-gray-50 px-3 py-2">
+          <div className="grid grid-cols-1 gap-2 text-xs">
+            <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-white/75 px-3 py-2.5">
               <span className="font-medium text-gray-600">Personal Information</span>
               <span className="font-semibold text-gray-800">
                 {completion.sections.personal.completed}/{completion.sections.personal.total}
               </span>
             </div>
-            <div className="flex items-center justify-between rounded border border-gray-200 bg-gray-50 px-3 py-2">
+            <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-white/75 px-3 py-2.5">
               <span className="font-medium text-gray-600">Health Information</span>
               <span className="font-semibold text-gray-800">
                 {completion.sections.health.completed}/{completion.sections.health.total}
               </span>
             </div>
-            <div className="flex items-center justify-between rounded border border-gray-200 bg-gray-50 px-3 py-2">
+            <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-white/75 px-3 py-2.5">
               <span className="font-medium text-gray-600">Partner Preferences</span>
               <span className="font-semibold text-gray-800">
                 {completion.sections.preferences.completed}/{completion.sections.preferences.total}
               </span>
             </div>
           </div>
+          </div>
         </ProfileSectionCard>
-        <form onSubmit={handleSubmit}>
+        </aside>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <nav className="sticky top-3 z-30 overflow-x-auto rounded-2xl border border-purple-100 bg-white/95 p-2 shadow-lg shadow-purple-100/60 backdrop-blur-md" aria-label="Profile sections">
+            <div className="flex min-w-max gap-2">
+              {[
+                ["Overview", "profile-profile-summary"],
+                ["Identity", "profile-verified-identity"],
+                ["Basic information", "profile-basic-information"],
+                ["Family & guardian", "profile-family-guardian"],
+                ["Career", "profile-education-career"],
+                ["Health", "profile-health-genetics"],
+                ["Lifestyle", "profile-lifestyle-interests"],
+                ["Partner preferences", "profile-partner-preferences"],
+              ].map(([label, target]) => (
+                <button
+                  key={target}
+                  type="button"
+                  onClick={() => navigateToProfileSection(target)}
+                  aria-current={activeProfileSection === target ? "location" : undefined}
+                  className={`rounded-xl px-4 py-2 text-sm font-medium transition focus:outline-none ${
+                    activeProfileSection === target
+                      ? "bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-md shadow-purple-200"
+                      : "text-gray-600 hover:bg-purple-100 hover:text-purple-800"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </nav>
+
           {/* Profile Header */}
           <ProfileHeader
             profile={profile}
@@ -891,12 +978,12 @@ const ProfilePage: React.FC = () => {
           />
 
           {/* Submit Button */}
-          <div className="mt-6 text-center">
+          <div className="flex justify-end rounded-2xl border border-purple-100 bg-white/80 p-4 shadow-sm backdrop-blur-sm">
             <button
               type="submit"
-              className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 transition"
+              className="rounded-xl bg-gradient-to-r from-[#653e86] to-[#a64f7b] px-7 py-3 font-semibold text-white shadow-lg shadow-purple-200 transition hover:-translate-y-0.5 hover:shadow-xl"
             >
-              Save Profile
+              Save profile changes
             </button>
           </div>
         </form>
@@ -924,7 +1011,7 @@ const ProfileHeader: React.FC<{
 
   return (
     <div className="mb-8 space-y-6">
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid items-start gap-5 md:grid-cols-3">
         <ProfileSectionCard
           title="Verified Identity"
           description="These identity details are shown from your verified profile records."
@@ -1152,13 +1239,16 @@ const PersonalInfoSection: React.FC<{
 }) => {
   return (
     <div className="mb-6">
-      <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Personal Information</h2>
+      <div className="mb-5 rounded-2xl border border-purple-200 bg-gradient-to-r from-purple-100 to-pink-50 px-5 py-4">
+        <h2 className="text-xl font-semibold text-gray-800">Personal Information</h2>
+        <p className="mt-1 text-sm text-gray-600">Complete each part below to improve your matches.</p>
+      </div>
       {personalRemaining > 0 && (
         <p className="text-sm text-gray-500 mb-4">
           Add {personalRemaining} more field{personalRemaining === 1 ? "" : "s"} to complete this section.
         </p>
       )}
-      <div className="space-y-6">
+      <div className="grid items-start gap-6 xl:grid-cols-2">
         <ProfileSectionCard
           title="Education & Career"
           description="Keep your academic and professional information in one place."
@@ -1192,7 +1282,7 @@ const PersonalInfoSection: React.FC<{
         </ProfileSectionCard>
 
         {/* Introductory Video */}
-        <div>
+        <div className="scroll-mt-28 rounded-2xl border border-blue-200 bg-blue-50 p-5 shadow-[0_8px_25px_rgba(59,130,246,0.06)] sm:p-6">
           <label className="block text-sm font-medium text-gray-700">Introductory Video</label>
           <div className="mt-1 flex items-center">
             <label
@@ -1232,8 +1322,8 @@ const PersonalInfoSection: React.FC<{
         </div>
 
         {/* Health & Genetics */}
-        <div>
-          <h3 className="text-xl font-semibold text-gray-800 mb-3 border-b pb-2">Health & Genetics</h3>
+        <div id="profile-health-genetics" className="scroll-mt-28 rounded-2xl border border-rose-200 bg-rose-50 p-5 shadow-[0_8px_25px_rgba(244,63,94,0.06)] [&_.bg-gray-50]:bg-white/70 [&_.border-gray-200]:border-white/80 sm:p-6 xl:col-span-2">
+          <h3 className="mb-3 border-b border-rose-200 pb-3 text-xl font-semibold text-gray-800">Health & Genetics</h3>
           {healthRemaining > 0 && (
             <p className="text-sm text-gray-500 mb-3">
               Add {healthRemaining} more field{healthRemaining === 1 ? "" : "s"} to strengthen this section.
@@ -2115,8 +2205,8 @@ const ProfileSummaryHeader: React.FC<{
       title="Profile Summary"
       description="A quick snapshot of the details currently saved in your profile."
     >
-      <div className="flex flex-col gap-6 md:flex-row md:items-start">
-        <div className="flex flex-col items-center gap-3 md:w-44 md:items-start md:shrink-0">
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-col items-center gap-3">
           <div className="relative">
             <img
               src={profile.profilePicture || "https://via.placeholder.com/160"}
@@ -2137,7 +2227,7 @@ const ProfileSummaryHeader: React.FC<{
               className="hidden"
             />
           </div>
-          <div className="text-center md:text-left">
+          <div className="text-center">
             <div className="text-sm font-medium text-gray-700">Profile Picture</div>
             <div>{hasProfilePicture ? <span className="text-sm text-gray-500">Added</span> : <EmptyValue />}</div>
           </div>
@@ -2151,24 +2241,24 @@ const ProfileSummaryHeader: React.FC<{
             </span>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <div className="grid grid-cols-1 gap-2">
+            <div className="rounded-lg border border-purple-200 bg-white/80 p-3">
               <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Name</div>
               <SummaryValue value={profile.name} />
             </div>
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <div className="rounded-lg border border-purple-200 bg-white/80 p-3">
               <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Age</div>
               <SummaryValue value={profile.age} />
             </div>
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <div className="rounded-lg border border-purple-200 bg-white/80 p-3">
               <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Gender</div>
               <SummaryValue value={profile.gender} />
             </div>
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <div className="rounded-lg border border-purple-200 bg-white/80 p-3">
               <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Location</div>
               <SummaryValue value={profile.location} />
             </div>
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <div className="rounded-lg border border-purple-200 bg-white/80 p-3">
               <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Profession</div>
               <SummaryValue value={profile.profession} />
             </div>

@@ -1,3 +1,32 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@keyframes profile-section-focus {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 8px 25px rgba(63, 45, 76, 0.06);
+    outline-color: transparent;
+  }
+  35% {
+    transform: scale(1.015);
+    box-shadow: 0 18px 42px rgba(107, 70, 150, 0.24);
+    outline-color: rgba(147, 51, 234, 0.48);
+  }
+}
+
+.profile-section-highlight {
+  position: relative;
+  z-index: 20;
+  outline: 4px solid transparent;
+  outline-offset: 3px;
+  animation: profile-section-focus 700ms ease-out;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-section-highlight {
+    animation: none;
+    outline-color: rgba(147, 51, 234, 0.48);
+  }
+}
