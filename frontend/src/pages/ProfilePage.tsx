@@ -997,10 +997,7 @@ const ProfileHeader: React.FC<{
   onInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   onProfilePictureChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }> = ({ profile, onInputChange, onProfilePictureChange }) => {
-  const identityLocked = profile.identityVerified;
-  const identityFieldClass = `mt-1 block w-full rounded-md border border-gray-300 px-4 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 ${
-    identityLocked ? "bg-gray-50 cursor-not-allowed" : ""
-  }`;
+  const identityFieldClass = "mt-1 block w-full cursor-not-allowed rounded-md border border-violet-200 bg-white/60 px-4 py-2 text-gray-600 shadow-sm outline-none";
   const standardFieldClass = "mt-1 block w-full rounded-md border border-gray-300 px-4 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500";
   const renderMissing = (value: string) =>
     !value ? (
@@ -1024,7 +1021,8 @@ const ProfileHeader: React.FC<{
                 name="name"
                 value={profile.name}
                 onChange={onInputChange}
-                readOnly={identityLocked}
+                readOnly
+                aria-readonly="true"
                 className={identityFieldClass}
                 placeholder="Not added yet"
               />
@@ -1037,7 +1035,8 @@ const ProfileHeader: React.FC<{
                 name="fatherName"
                 value={profile.fatherName}
                 onChange={onInputChange}
-                readOnly={identityLocked}
+                readOnly
+                aria-readonly="true"
                 className={identityFieldClass}
                 placeholder="Not added yet"
               />
@@ -1050,7 +1049,8 @@ const ProfileHeader: React.FC<{
                 name="motherName"
                 value={profile.motherName}
                 onChange={onInputChange}
-                readOnly={identityLocked}
+                readOnly
+                aria-readonly="true"
                 className={identityFieldClass}
                 placeholder="Not added yet"
               />
@@ -1063,7 +1063,8 @@ const ProfileHeader: React.FC<{
                 name="dateOfBirth"
                 value={profile.dateOfBirth}
                 onChange={onInputChange}
-                readOnly={identityLocked}
+                readOnly
+                aria-readonly="true"
                 className={identityFieldClass}
               />
               {renderMissing(profile.dateOfBirth)}
@@ -1074,9 +1075,9 @@ const ProfileHeader: React.FC<{
                 <VerifiedBadge verified={profile.identityVerified} />
               </div>
             </div>
-            {identityLocked && (
-              <p className="text-xs text-gray-500">Verified identity fields are locked and cannot be edited.</p>
-            )}
+            <p className="rounded-lg border border-violet-200 bg-white/60 p-2.5 text-xs leading-relaxed text-violet-700">
+              Identity fields are synced automatically from your verification records and cannot be edited here.
+            </p>
           </div>
         </ProfileSectionCard>
 
