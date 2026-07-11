@@ -25,6 +25,15 @@ def is_ready() -> bool:
         return False
 
 
+def _is_public_matchable_user(user: Optional[User]) -> bool:
+    return bool(
+        user
+        and not user.is_admin
+        and not user.is_deleted
+        and not user.is_archived
+    )
+
+
 def _query_row(user: User, profile: Profile) -> pd.Series:
     values: dict[str, Any] = {column: None for column in REQUIRED_COLUMNS}
     values.update({
@@ -61,7 +70,7 @@ def get_recommendations(current_user_id: str, db: Session, top_n: int = 100) -> 
         return None
     user = db.query(User).filter(User.id == current_user_id).first()
     profile = db.query(Profile).filter(Profile.user_id == current_user_id).first()
-    if not user or not profile or not profile.is_completed:
+    if not _is_public_matchable_user(user) or not profile or not profile.is_completed:
         return None
     query = _query_row(user, profile)
     query_frame = pd.DataFrame([query])
@@ -76,6 +85,7 @@ def get_recommendations(current_user_id: str, db: Session, top_n: int = 100) -> 
         db_id = candidate_id if artifact.get("id_source") == "database" else demo_user_id(candidate_id)
         eligible = db.query(User.id).join(Profile, Profile.user_id == User.id).filter(
             User.id == db_id, User.is_deleted == False, User.is_archived == False,
+            User.is_admin == False,
             Profile.is_completed == True,
         ).first()
         if not eligible:

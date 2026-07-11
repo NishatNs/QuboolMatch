@@ -65,7 +65,7 @@ async def admin_login(
     """
     Admin-specific login endpoint that only allows admin users
     """
-    user = UserRepository.get_by_email(db, username)
+    user = UserRepository.get_by_email(db, username.strip().lower())
 
     if not user:
         raise HTTPException(status_code=401, detail="Incorrect email or password")

@@ -17,6 +17,16 @@ from datetime import date, datetime
 router = APIRouter()
 
 
+def is_public_matchable_user(user: Optional[User]) -> bool:
+    """Return True when a user can appear in matchmaking surfaces."""
+    return bool(
+        user
+        and not user.is_admin
+        and not user.is_deleted
+        and not user.is_archived
+    )
+
+
 def get_current_user_id(authorization: str = Header(None), db: Session = Depends(get_db)) -> str:
     """Extract and verify user ID from Authorization header"""
     print(f"DEBUG: Authorization header: {authorization}")
@@ -574,7 +584,9 @@ async def browse_users(
         blocked_ids = BlockRepository.get_blocked_user_ids(db, current_user_id)
         total_query = db.query(User).filter(
             User.id != current_user_id,
-            User.is_deleted == False
+            User.is_deleted == False,
+            User.is_archived == False,
+            User.is_admin == False
         )
         if blocked_ids:
             total_query = total_query.filter(User.id.notin_(blocked_ids))
@@ -585,7 +597,9 @@ async def browse_users(
         # Get paginated users
         users_query = db.query(User).filter(
             User.id != current_user_id,
-            User.is_deleted == False
+            User.is_deleted == False,
+            User.is_archived == False,
+            User.is_admin == False
         )
         if blocked_ids:
             users_query = users_query.filter(User.id.notin_(blocked_ids))
@@ -727,7 +741,9 @@ async def get_recommendations(
                 print("[RECOMMENDATIONS] ML not ready, falling back to all users")
             users_query = db.query(User).filter(
                 User.id != current_user_id,
-                User.is_deleted == False
+                User.is_deleted == False,
+                User.is_archived == False,
+                User.is_admin == False
             )
             if blocked_ids:
                 users_query = users_query.filter(User.id.notin_(blocked_ids))
@@ -748,7 +764,7 @@ async def get_recommendations(
         print(f"[RECOMMENDATIONS] Processing {len(paginated_ids)} user IDs from page {page}...")
         for uid in paginated_ids:
             user = db.query(User).filter(User.id == uid).first()
-            if not user or user.is_deleted:
+            if not is_public_matchable_user(user):
                 continue
 
             profile = ProfileRepository.get_by_user_id(db, uid)
@@ -856,6 +872,13 @@ async def get_full_profile(
         
         # Import here to avoid circular import
         from repositories.interest_repository.interest_repository import InterestRepository
+
+        # Get user and reject system/admin or inactive targets before relationship checks
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        if not is_public_matchable_user(user):
+            raise HTTPException(status_code=403, detail="This account is not available for matchmaking.")
         
         if BlockRepository.is_blocked_between(db, current_user_id, user_id):
             raise HTTPException(status_code=403, detail="You cannot view this profile")
@@ -869,11 +892,7 @@ async def get_full_profile(
                 detail="You can only view full profiles of users with mutual interest"
             )
         
-        # Get user and profile
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-        
+        # Get profile
         profile = ProfileRepository.get_by_user_id(db, user_id)
         if not profile:
             raise HTTPException(status_code=404, detail="Profile not found")
