@@ -146,6 +146,7 @@ class ProfileCreate(BaseModel):
     religion: Optional[str] = None
 
     # Personal Information
+    address: Optional[str] = None
     location: Optional[str] = None
     father_name: Optional[str] = None
     mother_name: Optional[str] = None
@@ -248,6 +249,8 @@ async def create_profile(
 
         if user.identity_verified:
             profile_dict["identity_verified"] = True
+            profile_dict.pop("address", None)
+            profile_dict.pop("blood_group", None)
             if user.father_name is not None:
                 profile_dict["father_name"] = user.father_name
             if user.mother_name is not None:
@@ -362,12 +365,18 @@ async def update_profile(
 
         if user.identity_verified:
             profile_dict["identity_verified"] = True
+            profile_dict.pop("address", None)
+            profile_dict.pop("blood_group", None)
             if user.father_name is not None:
                 profile_dict["father_name"] = user.father_name
             if user.mother_name is not None:
                 profile_dict["mother_name"] = user.mother_name
             if user.date_of_birth is not None:
                 profile_dict["date_of_birth"] = user.date_of_birth
+            if profile.address is not None:
+                profile_dict["address"] = profile.address
+            if profile.blood_group is not None:
+                profile_dict["blood_group"] = profile.blood_group
         
         # Process base64 files
         if 'profile_picture' in profile_dict and profile_dict['profile_picture']:
