@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { getAccessToken, API_BASE_URL } from "../services/api";
 import IntroVideoDisplay from "../components/IntroVideoDisplay";
 import MedicalDocumentsDisplay from "../components/MedicalDocumentsDisplay";
+import { getProfileCompletion } from "../utils/profileCompletion";
 
 // Define interface for the lifestyle preferences
 interface LifestylePreferences {
@@ -82,21 +83,6 @@ interface ProfileData {
   careerSupportExpectations: string;
   necessaryPreferences: string[];
   additionalComments: string;
-}
-
-interface CompletionSection {
-  completed: number;
-  total: number;
-  percent: number;
-}
-
-interface CompletionResult {
-  overallPercent: number;
-  sections: {
-    personal: CompletionSection;
-    health: CompletionSection;
-    preferences: CompletionSection;
-  };
 }
 
 interface ProfileSectionCardProps {
@@ -245,78 +231,6 @@ const parseAdditionalComments = (value: string | null | undefined) => {
     preferredReligionComment,
     preferredEducationComment,
     careerSupportComment
-  };
-};
-
-const isFilled = (value: unknown): boolean => {
-  if (value === null || value === undefined) return false;
-  if (typeof value === "string") return value.trim().length > 0;
-  if (typeof value === "number") return Number.isFinite(value);
-  if (typeof value === "boolean") return value === true;
-  if (Array.isArray(value)) return value.length > 0;
-  return false;
-};
-
-const getSectionCompletion = (fields: unknown[]): CompletionSection => {
-  const total = fields.length;
-  const completed = fields.filter(isFilled).length;
-  const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
-  return { completed, total, percent };
-};
-
-const getProfileCompletion = (profile: ProfileData): CompletionResult => {
-  const personalFields = [
-    profile.name,
-    profile.age,
-    profile.dateOfBirth,
-    profile.gender,
-    profile.address,
-    profile.location,
-    profile.religion,
-    profile.maritalStatus,
-    profile.academicBackground,
-    profile.profession,
-    profile.fatherName,
-    profile.motherName,
-    profile.guardianName,
-    profile.guardianRelation,
-    profile.guardianContactNumber
-  ];
-
-  const healthFields = [
-    profile.overallHealthStatus,
-    profile.medicalHistory,
-    profile.longTermCondition,
-    profile.longTermConditionDescription,
-    profile.bloodGroup,
-    profile.geneticConditions,
-    profile.fertilityAwareness,
-    profile.disability,
-    profile.disabilityDescription
-  ];
-
-  const preferenceFields = [
-    profile.preferredAgeMin,
-    profile.preferredAgeMax,
-    profile.preferredReligion,
-    profile.preferredLocation
-  ];
-
-  const personal = getSectionCompletion(personalFields);
-  const health = getSectionCompletion(healthFields);
-  const preferences = getSectionCompletion(preferenceFields);
-
-  const totalCompleted = personal.completed + health.completed + preferences.completed;
-  const totalFields = personal.total + health.total + preferences.total;
-  const overallPercent = totalFields > 0 ? Math.round((totalCompleted / totalFields) * 100) : 0;
-
-  return {
-    overallPercent,
-    sections: {
-      personal,
-      health,
-      preferences
-    }
   };
 };
 
@@ -516,9 +430,14 @@ const ProfilePage: React.FC = () => {
         // Handle individual genetic condition checkboxes
         const conditionValue = name.replace('geneticCondition_', '');
         setProfile((prev) => {
-          const conditions = [...prev.geneticConditions];
+          let conditions = [...prev.geneticConditions];
+          if (conditionValue === "None") {
+            return { ...prev, geneticConditions: checked ? ["None"] : [] };
+          }
+
           if (checked && !conditions.includes(conditionValue)) {
             conditions.push(conditionValue);
+            conditions = conditions.filter((condition) => condition !== "None");
           } else if (!checked) {
             const index = conditions.indexOf(conditionValue);
             if (index > -1) {
@@ -700,6 +619,7 @@ const ProfilePage: React.FC = () => {
 
       const result = await response.json();
       console.log("Profile Saved:", result);
+      window.dispatchEvent(new Event("profile-completion-refresh"));
       alert("Profile information saved successfully!");
     } catch (error) {
       console.error('Error saving profile:', error);
@@ -1348,7 +1268,7 @@ const PersonalInfoSection: React.FC<{
 
         {/* Introductory Video */}
         <div className="scroll-mt-28 rounded-2xl border border-blue-200 bg-blue-50 p-5 shadow-[0_8px_25px_rgba(59,130,246,0.06)] sm:p-6">
-          <label className="block text-sm font-medium text-gray-700">Introductory Video</label>
+          <label className="block text-sm font-medium text-gray-700">Introductory Video (Optional)</label>
           <div className="mt-1 flex items-center">
             <label
               htmlFor="introVideo"
@@ -1375,7 +1295,7 @@ const PersonalInfoSection: React.FC<{
             )}
           </div>
           <p className="mt-1 text-sm text-gray-500">
-            Upload a short video introduction (max 60 seconds, MP4 format recommended)
+            Upload a short video introduction if you want. This is not counted in profile completion.
           </p>
           <div className="mt-3">
             <IntroVideoDisplay 
@@ -1507,9 +1427,21 @@ const PersonalInfoSection: React.FC<{
           {/* Genetic Conditions */}
           <div className="bg-gray-50 p-4 rounded-lg mb-4">
             <h4 className="text-md font-medium text-gray-800 mb-3">Genetic & Medical Conditions</h4>
-            <p className="text-sm text-gray-500 mb-3">Please indicate if you have any of the following conditions:</p>
+            <p className="text-sm text-gray-500 mb-3">Please indicate if you have any of the following conditions, or select none if they do not apply.</p>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 mb-4">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="noGeneticConditions"
+                  name="geneticCondition_None"
+                  checked={profile.geneticConditions.includes('None')}
+                  onChange={onInputChange}
+                  className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                />
+                <label htmlFor="noGeneticConditions" className="ml-2 block text-sm text-gray-700">None of these</label>
+              </div>
+
               <div className="flex items-center">
                 <input
                   type="checkbox"
@@ -1567,7 +1499,6 @@ const PersonalInfoSection: React.FC<{
                   onChange={onInputChange}
                   className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
                 />
-                <label htmlFor="cancer" className="ml-2 block text-sm text-gray-700">Cancer</label>
                 <label htmlFor="cancer" className="ml-2 block text-sm text-gray-700">Cancer</label>
               </div>
             </div>

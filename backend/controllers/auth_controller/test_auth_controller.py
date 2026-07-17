@@ -4,7 +4,7 @@ def test_sign_up_success(client):
     payload = {
         "name": "New User",
         "email": "newuser@example.com", 
-        "password": "123123",
+        "password": "Aa1!aaa",
         "gender": "Male",
         "nid": "NID_12345",
         "age": 25,
@@ -28,10 +28,12 @@ def test_sign_up_user_exists(client, db_session):
     payload = {
         "name": "Test User 1",
         "email": "testuser1@example.com", 
-        "password": "123123",
+        "password": "Password123!",
         "gender": "Female",
         "nid": "NID_54321",
-        "age": 24
+        "age": 24,
+        "preferred_age_from": 20,
+        "preferred_age_to": 30
     }
 
     user = User(
@@ -48,6 +50,41 @@ def test_sign_up_user_exists(client, db_session):
     response = client.post("/auth/sign_up", json=payload)
     assert response.status_code == 400
     assert response.json() == {'detail': 'User already registered or NID already exists'}
+
+
+def test_sign_up_rejects_weak_password(client):
+    payload = {
+        "name": "Weak Password User",
+        "email": "weakpassword@example.com",
+        "password": "123123",
+        "gender": "Male",
+        "nid": "NID_WEAK_PASSWORD",
+        "age": 25,
+        "preferred_age_from": 20,
+        "preferred_age_to": 30
+    }
+
+    response = client.post("/auth/sign_up", json=payload)
+    assert response.status_code == 422
+    response_json = response.json()
+    assert "uppercase, lowercase, number, and special character" in str(response_json["detail"])
+
+
+def test_sign_up_rejects_missing_required_signup_fields(client):
+    payload = {
+        "name": "Missing Fields User",
+        "email": "missingfields@example.com",
+        "password": "Aa1!aaa",
+        "gender": "Male",
+        "nid": "NID_MISSING_FIELDS",
+        "age": 25
+    }
+
+    response = client.post("/auth/sign_up", json=payload)
+    assert response.status_code == 422
+    response_json = response.json()
+    assert "preferred_age_from" in str(response_json["detail"])
+    assert "preferred_age_to" in str(response_json["detail"])
 
 
 # Test sign_in success

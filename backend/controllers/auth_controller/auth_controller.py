@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from fastapi.responses import JSONResponse
 from fastapi import APIRouter, Depends, Response, HTTPException, Form
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 from database import get_db
 from repositories.user_repository.user_repository import UserRepository
 from facade import register_user
@@ -10,17 +10,49 @@ from typing import Optional
 
 router = APIRouter()
 
+PASSWORD_REQUIREMENTS = (
+    "Password must be 7-128 characters and include uppercase, lowercase, "
+    "number, and special character."
+)
+
 
 class UserSignUp(BaseModel):
-    name: str
+    name: str = Field(min_length=1)
     email: EmailStr
-    password: str
-    gender: str
-    nid: str
-    age: int
+    password: str = Field(min_length=7, max_length=128)
+    gender: str = Field(min_length=1)
+    nid: str = Field(min_length=1)
+    age: int = Field(ge=18, le=99)
     religion: Optional[str] = None
-    preferred_age_from: Optional[int] = None
-    preferred_age_to: Optional[int] = None
+    preferred_age_from: int = Field(ge=18, le=99)
+    preferred_age_to: int = Field(ge=18, le=99)
+
+    @field_validator("name", "gender", "nid")
+    @classmethod
+    def validate_required_text(cls, value: str) -> str:
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("This field is required.")
+        return trimmed
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, password: str) -> str:
+        has_upper = any(char.isupper() for char in password)
+        has_lower = any(char.islower() for char in password)
+        has_digit = any(char.isdigit() for char in password)
+        has_special = any(not char.isalnum() for char in password)
+
+        if not all([has_upper, has_lower, has_digit, has_special]):
+            raise ValueError(PASSWORD_REQUIREMENTS)
+
+        return password
+
+    @model_validator(mode="after")
+    def validate_preferred_age_range(self):
+        if self.preferred_age_from > self.preferred_age_to:
+            raise ValueError("Preferred age range 'From' must be less than or equal to 'To'.")
+        return self
 
 
 @router.post("/sign_up")
