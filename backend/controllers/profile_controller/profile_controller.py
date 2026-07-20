@@ -739,6 +739,7 @@ async def get_recommendations(
         # Get ML-ranked user_id list (or None if user not in model index) - fetch more for pagination
         ranked_matches = ml_recommend(current_user_id, db, top_n=100) if ml_ready else None
         reasons_by_id = {item["user_id"]: item["reason_tags"] for item in (ranked_matches or [])}
+        explanations_by_id = {item["user_id"]: item.get("match_explanation") for item in (ranked_matches or [])}
         ranked_ids = [item["user_id"] for item in ranked_matches] if ranked_matches else None
         print(f"[RECOMMENDATIONS] ML ready: {ml_ready}, Ranked IDs count: {len(ranked_ids) if ranked_ids else 0}")
 
@@ -839,7 +840,8 @@ async def get_recommendations(
                 "preferred_age_max": profile.preferred_age_max if profile else None,
                 "living_with_in_laws": profile.living_with_in_laws if profile else None,
                 "willing_to_relocate": profile.willing_to_relocate if profile else None,
-                "recommendation_reasons": reasons_by_id.get(user.id, [])
+                "recommendation_reasons": reasons_by_id.get(user.id, []),
+                "match_explanation": explanations_by_id.get(user.id)
             })
 
         has_more = (offset + len(result)) < total_count

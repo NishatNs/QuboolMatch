@@ -35,6 +35,8 @@ class User(Base):
     identity_verified = Column(Boolean, default=False, nullable=False)
     is_deleted = Column(Boolean, default=False)
     is_archived = Column(Boolean, default=False)
+    email_verified = Column(Boolean, default=False, nullable=False)
+    email_verified_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(
         timezone.utc), nullable=False)
     
@@ -88,6 +90,8 @@ class User(Base):
         self.identity_verified = False
         self.is_deleted = False
         self.is_archived = False
+        self.email_verified = False
+        self.email_verified_at = None
         self.verification_status = "not_submitted"
         self.guardian_verification_status = "not_submitted"
         self.ocr_confirmed = False

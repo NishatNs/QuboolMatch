@@ -37,7 +37,8 @@ const getErrorMessage = async (response: Response) => {
 };
 
 const SignUp: React.FC = () => {
-  const ONBOARDING_PENDING_KEY = "verificationOnboardingPending";
+  const PENDING_SIGNUP_USER_ID_KEY = "pendingSignupUserId";
+  const PENDING_SIGNUP_EMAIL_KEY = "pendingSignupEmail";
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -51,19 +52,17 @@ const SignUp: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
   const navigate = useNavigate();
-  const { login, isLoggedIn, isAuthReady } = useAuth();
+  const { isLoggedIn, isAuthReady } = useAuth();
   const passwordIssues = getPasswordIssues(formData.password);
   const isPasswordTouched = formData.password.length > 0;
   const isPasswordValid = isPasswordTouched && passwordIssues.length === 0;
 
   useEffect(() => {
-    if (isAuthReady && isLoggedIn && !successMessage) {
-      const onboardingPending = localStorage.getItem(ONBOARDING_PENDING_KEY) === "true";
-      navigate(onboardingPending ? "/nid-verification" : "/", { replace: true });
+    if (isAuthReady && isLoggedIn) {
+      navigate("/", { replace: true });
     }
-  }, [isAuthReady, isLoggedIn, navigate, successMessage]);
+  }, [isAuthReady, isLoggedIn, navigate]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -79,7 +78,6 @@ const SignUp: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError("");
-    setSuccessMessage("");
     // Client-side validations
     if (!formData.name.trim() || !formData.email.trim() || !formData.password || !formData.gender || !formData.nid.trim() || !formData.age || !ageRange.from || !ageRange.to) {
       setError("Please fill in all required fields before signing up.");
@@ -152,13 +150,9 @@ const SignUp: React.FC = () => {
       // Get the access token from the response
       const data = await response.json();
       
-      // Log the user in with the real token
-      localStorage.setItem(ONBOARDING_PENDING_KEY, "true");
-      login(data.access_token);
-      setSuccessMessage("Sign up successful. Redirecting you to NID verification...");
-      window.setTimeout(() => {
-        navigate("/nid-verification", { replace: true });
-      }, 1200);
+      sessionStorage.setItem(PENDING_SIGNUP_USER_ID_KEY, data.user_id);
+      sessionStorage.setItem(PENDING_SIGNUP_EMAIL_KEY, data.email || formData.email.trim());
+      navigate("/verify-email", { replace: true });
     } catch (err) {
       console.error("Signup error:", err);
       setError(err instanceof Error ? err.message : "An error occurred during signup");
@@ -167,7 +161,7 @@ const SignUp: React.FC = () => {
     }
   };
 
-  return isAuthReady && isLoggedIn && !successMessage ? (
+  return isAuthReady && isLoggedIn ? (
     <Navigate to="/" replace />
   ) : (
     <div className="auth-animated-page flex min-h-screen items-center justify-center px-4 py-24 sm:px-6 lg:px-8">
@@ -382,15 +376,6 @@ const SignUp: React.FC = () => {
             {error && (
               <div className="rounded-2xl border border-red-200 bg-red-50/90 p-4 text-sm font-medium text-red-700">
                 {error}
-              </div>
-            )}
-
-            {successMessage && (
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/95 p-4 text-center shadow-sm">
-                <p className="text-base font-bold text-emerald-800">Sign up successful</p>
-                <p className="mt-1 text-sm font-medium text-emerald-700">
-                  Redirecting you to NID verification...
-                </p>
               </div>
             )}
 

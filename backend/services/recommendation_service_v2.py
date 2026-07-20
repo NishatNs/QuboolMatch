@@ -10,7 +10,7 @@ from models.profile.profile import Profile
 from models.user.user import User
 from recommendation.recommender import (
     DEFAULT_ARTIFACTS, INTEREST_COLS, NUMERIC_COLS, REQUIRED_COLUMNS,
-    _candidate_is_eligible, _directional_preferences, _interest_tokens,
+    _build_match_explanation, _candidate_is_eligible, _directional_preferences, _interest_tokens,
     _parse_list, _priority_key, _reasons, _text,
     load_runtime_artifacts, transform_profiles,
 )
@@ -95,9 +95,11 @@ def get_recommendations(current_user_id: str, db: Session, top_n: int = 100) -> 
         b_to_a = _directional_preferences(candidate, query)
         preference = (a_to_b["score"] + b_to_a["score"]) / 2
         relaxed = set(a_to_b["required_failures"] + b_to_a["required_failures"])
+        explanation = _build_match_explanation(query, candidate, a_to_b, b_to_a, similarity, preference)
         scored.append({"user_id": db_id, "score": .4 * similarity + .6 * preference,
                        "similarity": similarity, "strict": not relaxed,
                        "reason_tags": _reasons(a_to_b, b_to_a, similarity),
+                       "match_explanation": explanation,
                        "priority_key": _priority_key(
                            a_to_b, b_to_a, .4 * similarity + .6 * preference,
                            similarity, db_id,
