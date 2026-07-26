@@ -20,6 +20,7 @@ PASSWORD_REQUIREMENTS = (
     "Password must be 7-128 characters and include uppercase, lowercase, "
     "number, and special character."
 )
+MIN_NID_LENGTH = 8
 
 
 class UserSignUp(BaseModel):
@@ -27,18 +28,28 @@ class UserSignUp(BaseModel):
     email: EmailStr
     password: str = Field(min_length=7, max_length=128)
     gender: str = Field(min_length=1)
-    nid: str = Field(min_length=1)
+    nid: str = Field(min_length=MIN_NID_LENGTH)
     age: int = Field(ge=18, le=99)
     religion: Optional[str] = None
     preferred_age_from: int = Field(ge=18, le=99)
     preferred_age_to: int = Field(ge=18, le=99)
 
-    @field_validator("name", "gender", "nid")
+    @field_validator("name", "gender")
     @classmethod
     def validate_required_text(cls, value: str) -> str:
         trimmed = value.strip()
         if not trimmed:
             raise ValueError("This field is required.")
+        return trimmed
+
+    @field_validator("nid")
+    @classmethod
+    def validate_nid(cls, value: str) -> str:
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("This field is required.")
+        if len(trimmed) < MIN_NID_LENGTH:
+            raise ValueError(f"NID number must be at least {MIN_NID_LENGTH} characters.")
         return trimmed
 
     @field_validator("email")

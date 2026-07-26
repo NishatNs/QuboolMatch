@@ -166,11 +166,6 @@ const Navbar: React.FC = () => {
           {/* Desktop Navigation */}
           <div className="hidden lg:flex items-center space-x-1">
             <NavLink to="/#home">Home</NavLink>
-            <NavLink to="/#about">About</NavLink>
-            <NavLink to="/#services">Services</NavLink>
-            <NavLink to="/#why-choose-us">Why Us</NavLink>
-            <NavLink to="/#testimonials">Testimonials</NavLink>
-            <NavLink to="/#contact">Contact</NavLink>
             
             {isLoggedIn && (
               <>
@@ -243,11 +238,6 @@ const Navbar: React.FC = () => {
           <div className="lg:hidden py-4 border-t border-gray-100 animate-slide-down">
             <div className="flex flex-col space-y-2">
               <MobileNavLink to="/#home" onClick={() => setIsMobileMenuOpen(false)}>Home</MobileNavLink>
-              <MobileNavLink to="/#about" onClick={() => setIsMobileMenuOpen(false)}>About</MobileNavLink>
-              <MobileNavLink to="/#services" onClick={() => setIsMobileMenuOpen(false)}>Services</MobileNavLink>
-              <MobileNavLink to="/#why-choose-us" onClick={() => setIsMobileMenuOpen(false)}>Why Us</MobileNavLink>
-              <MobileNavLink to="/#testimonials" onClick={() => setIsMobileMenuOpen(false)}>Testimonials</MobileNavLink>
-              <MobileNavLink to="/#contact" onClick={() => setIsMobileMenuOpen(false)}>Contact</MobileNavLink>
               
               {isLoggedIn && (
                 <>

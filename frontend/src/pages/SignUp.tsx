@@ -10,6 +10,7 @@ const PASSWORD_REQUIREMENTS = [
   { label: "One number", test: (value: string) => /\d/.test(value) },
   { label: "One special character", test: (value: string) => /[^A-Za-z0-9]/.test(value) },
 ];
+const MIN_NID_LENGTH = 8;
 
 const getPasswordIssues = (password: string) => {
   return PASSWORD_REQUIREMENTS.filter((requirement) => !requirement.test(password));
@@ -81,6 +82,12 @@ const SignUp: React.FC = () => {
     // Client-side validations
     if (!formData.name.trim() || !formData.email.trim() || !formData.password || !formData.gender || !formData.nid.trim() || !formData.age || !ageRange.from || !ageRange.to) {
       setError("Please fill in all required fields before signing up.");
+      setLoading(false);
+      return;
+    }
+
+    if (formData.nid.trim().length < MIN_NID_LENGTH) {
+      setError(`NID number must be at least ${MIN_NID_LENGTH} characters.`);
       setLoading(false);
       return;
     }
@@ -323,6 +330,7 @@ const SignUp: React.FC = () => {
                   placeholder="Enter your NID number"
                   value={formData.nid}
                   onChange={handleInputChange}
+                  minLength={MIN_NID_LENGTH}
                   required
                 />
               </div>
